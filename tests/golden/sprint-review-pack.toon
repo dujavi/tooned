@@ -1,0 +1,31 @@
+syncMeta:
+  lastSync: "2026-07-10T12:29:00.000Z"
+  dataAgeSeconds: 60
+  syncStatus: idle
+sprint:
+  id: 209
+  name: CRM Sprint 42.5
+  state: future
+count: 1 stories
+stories[1]{key,summary,status,subtasks}:
+  CRM-5689,Improve sprint review dashboard readability for support workflows,In Progress,2
+backlogCount: 0
+backlogStories: []
+reviewPack:
+  generatedAt: "2026-07-10T12:30:00.000Z"
+  storyCount: 1
+  stories[1]:
+    - key: CRM-5689
+      summary: Improve sprint review dashboard readability for support workflows
+      status: In Progress
+      storyPoints: 5
+      assignees[1]: Agent Demo
+      subtaskCount: 2
+      timeSpentHours: 1.5
+      done: false
+      sme: Delivery Enablement
+      descriptionExcerpt: Focus on concise risk summaries for review calls.
+      acceptanceCriteria[1]: Given review starts when panel opens then key risks are visible.
+      implementationHint: null
+emptyState: null
+help[1]: Run `tooned sprint next --review-pack --enriched` for reviewer prep with cached hints

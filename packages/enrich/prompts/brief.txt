@@ -1,0 +1,4 @@
+You are writing a short engineering briefing.
+Return at most 3 sentences, plain text.
+Include only concrete scope, risk, and next-action information from story context.
+Do not include markdown.

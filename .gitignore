@@ -1,0 +1,11 @@
+.env
+tooned.yaml
+data/
+node_modules/
+dist/
+*.tsbuildinfo
+*.db
+*.db-shm
+*.db-wal
+.cursor-agent-shell-report.*
+AGENT_COMMAND_OUTPUT.txt

@@ -1,0 +1,57 @@
+{
+  "id": "10001",
+  "key": "CRM-101",
+  "fields": {
+    "summary": "Add modal accessibility labels",
+    "description": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "heading",
+          "attrs": { "level": 2 },
+          "content": [{ "type": "text", "text": "User Story" }]
+        },
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "As a support user, I need modal labels to be readable." }]
+        },
+        {
+          "type": "heading",
+          "attrs": { "level": 2 },
+          "content": [{ "type": "text", "text": "Acceptance Criteria" }]
+        },
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "AC1: GIVEN modal open WHEN screen reader starts THEN title is announced." }]
+        }
+      ]
+    },
+    "status": { "name": "In Progress" },
+    "issuetype": { "name": "Story" },
+    "updated": "2026-07-09T12:00:00.000+0000",
+    "comment": {
+      "comments": [
+        {
+          "id": "c-101",
+          "created": "2026-07-09T12:01:00.000+0000",
+          "author": { "displayName": "Demo User" },
+          "body": {
+            "type": "doc",
+            "version": 1,
+            "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Looks good." }] }]
+          }
+        }
+      ]
+    },
+    "attachment": [
+      {
+        "id": "a-101",
+        "filename": "accessibility-notes.md",
+        "mimeType": "text/markdown",
+        "size": 321
+      }
+    ],
+    "issuelinks": []
+  }
+}

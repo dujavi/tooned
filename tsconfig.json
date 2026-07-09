@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/jira" },
+    { "path": "packages/bitbucket" },
+    { "path": "packages/github" },
+    { "path": "packages/enrich" },
+    { "path": "packages/sync" },
+    { "path": "packages/service" },
+    { "path": "packages/cli" }
+  ]
+}

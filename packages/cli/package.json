@@ -1,0 +1,35 @@
+{
+  "name": "@tooned/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "tooned": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "test": "vitest run --passWithNoTests",
+    "lint": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@tooned/core": "workspace:*",
+    "@tooned/jira": "workspace:*",
+    "@tooned/service": "workspace:*",
+    "@tooned/sync": "workspace:*",
+    "commander": "^13.1.0",
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

@@ -1,0 +1,11 @@
+syncMeta:
+  lastSync: "2026-07-09T20:00:00.000Z"
+  dataAgeSeconds: 60
+  syncStatus: idle
+bin: ~/.local/bin/tooned
+description: Inspect synced Jira stories and sprint delivery state
+serviceRunning: true
+storyCount: 12
+openStoryCount: 7
+currentSprint: null
+help[2]: Run `tooned sprint current --workload` to inspect current sprint,Run `tooned stories list --limit 20` to browse stories

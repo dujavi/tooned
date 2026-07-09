@@ -1,0 +1,39 @@
+# Tooned project configuration
+# Copy to tooned.yaml and customize for your Jira instance.
+# See examples/ for optional presets.
+
+jira:
+  projectKey: MYPROJ
+  boardId: 1
+  storyIssueType: Story
+  # Optional: compare board filter JQL during `tooned doctor --verbose`
+  # bootstrapJql: "project = MYPROJ AND issuetype = Story"
+
+# Map semantic field names to Jira custom field IDs (numbers or customfield_*).
+# Discover IDs via GET /rest/api/3/field or your Jira admin UI.
+fields:
+  storyPoints: "10016"
+  sprint: "10020"
+  team: "10001"
+  developerNotes: "10078"
+  promotionStatus: "10079"
+  development: "10000"
+  fixVersions: fixVersions
+
+# Definition-of-done subtask templates matched by team name (substring match on subtask summary).
+dodTemplates:
+  - team: default
+    expectedSubtasks:
+      - Test
+      - Evaluate DoD
+
+vcs:
+  bitbucket:
+    workspace: my-workspace
+  urlDomains:
+    form: []
+    confluence: []
+
+parsing:
+  # Optional override for extracting SME name from markdown descriptions.
+  # smePattern: "\\*\\*SME\\*\\*:\\s*(.+)$"

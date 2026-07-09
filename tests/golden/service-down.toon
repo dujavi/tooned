@@ -1,0 +1,6 @@
+syncMeta:
+  lastSync: null
+  dataAgeSeconds: null
+  syncStatus: error
+error: tooned service unavailable on port 7420
+help[1]: Run `tooned serve` to start service on port 7420

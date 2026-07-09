@@ -1,0 +1,8 @@
+{
+  "bitbucketPullRequestUrl": "https://bitbucket.org/acme/tools/pull-requests/42",
+  "bitbucketCommitUrl": "https://bitbucket.org/acme/tools/commits/abc1234def56",
+  "githubPullRequestUrl": "https://github.com/acme/tools/pull/91",
+  "githubCommitUrl": "https://github.com/acme/tools/commit/abcdef123456",
+  "nonVcsUrl": "https://example.internal/docs/123",
+  "developerNotes": "hotfix refs: abc1234 and DEF5678 plus duplicate abc1234"
+}

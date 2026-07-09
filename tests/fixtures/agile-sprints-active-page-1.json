@@ -1,0 +1,16 @@
+{
+  "maxResults": 50,
+  "startAt": 0,
+  "total": 2,
+  "isLast": false,
+  "values": [
+    {
+      "id": 201,
+      "name": "CRM Sprint 42",
+      "state": "active",
+      "startDate": "2026-07-01T09:00:00.000Z",
+      "endDate": "2026-07-15T09:00:00.000Z",
+      "originBoardId": 7
+    }
+  ]
+}

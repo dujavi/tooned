@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "references": [
+    { "path": "../core" },
+    { "path": "../jira" },
+    { "path": "../bitbucket" },
+    { "path": "../github" },
+    { "path": "../enrich" }
+  ],
+  "include": ["src/**/*"]
+}

@@ -1,0 +1,28 @@
+{
+  "maxResults": 50,
+  "startAt": 0,
+  "total": 3,
+  "isLast": true,
+  "values": [
+    {
+      "id": 210,
+      "name": "CRM Sprint 43",
+      "state": "future",
+      "startDate": "2026-08-01T09:00:00.000Z",
+      "originBoardId": 7
+    },
+    {
+      "id": 209,
+      "name": "CRM Sprint 42.5",
+      "state": "future",
+      "startDate": "2026-07-18T09:00:00.000Z",
+      "originBoardId": 7
+    },
+    {
+      "id": 211,
+      "name": "CRM Sprint TBD",
+      "state": "future",
+      "originBoardId": 7
+    }
+  ]
+}

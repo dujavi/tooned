@@ -1,0 +1,28 @@
+{
+  "active": [
+    {
+      "id": 201,
+      "name": "CRM Sprint 42",
+      "state": "active",
+      "startDate": "2026-07-01T09:00:00.000Z",
+      "endDate": "2026-07-15T09:00:00.000Z",
+      "originBoardId": 7
+    }
+  ],
+  "future": [
+    {
+      "id": 209,
+      "name": "CRM Sprint 42.5",
+      "state": "future",
+      "startDate": "2026-07-18T09:00:00.000Z",
+      "originBoardId": 7
+    },
+    {
+      "id": 210,
+      "name": "CRM Sprint 43",
+      "state": "future",
+      "startDate": "2026-08-01T09:00:00.000Z",
+      "originBoardId": 7
+    }
+  ]
+}

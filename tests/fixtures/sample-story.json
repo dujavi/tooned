@@ -1,0 +1,98 @@
+{
+  "id": "10009",
+  "key": "CRM-5689",
+  "fields": {
+    "summary": "Improve sprint review dashboard readability",
+    "description": {
+      "type": "doc",
+      "version": 1,
+      "content": [
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "User Story"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "As a delivery manager, I can quickly scan sprint risks in a compact panel."
+            }
+          ]
+        },
+        {
+          "type": "heading",
+          "attrs": {
+            "level": 2
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Acceptance Criteria"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "AC1: GIVEN open stories WHEN sprint review starts THEN workload totals are shown."
+            }
+          ]
+        }
+      ]
+    },
+    "status": {
+      "name": "In Progress"
+    },
+    "issuetype": {
+      "name": "Story"
+    },
+    "updated": "2026-07-08T17:10:00.000+0000",
+    "comment": {
+      "comments": [
+        {
+          "id": "c-5689",
+          "created": "2026-07-08T17:11:00.000+0000",
+          "updated": "2026-07-08T17:11:00.000+0000",
+          "author": {
+            "displayName": "Agent Demo"
+          },
+          "body": {
+            "type": "doc",
+            "version": 1,
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Need confirmation from @ux-review before release."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "attachment": [
+      {
+        "id": "att-1",
+        "filename": "review-notes.md",
+        "mimeType": "text/markdown",
+        "size": 512
+      }
+    ],
+    "issuelinks": []
+  }
+}

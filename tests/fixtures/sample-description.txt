@@ -1,0 +1,22 @@
+## User Story
+As a service rep, I can see modal context while triaging tickets.
+
+## Requirements
+- Render keyboard hints in the modal footer.
+- Keep style consistent with design system.
+
+**SME**: Product Enablement Team
+
+## Acceptance Criteria
+AC1: GIVEN an open modal
+WHEN tab key is pressed
+THEN focus remains inside the modal
+
+AC2: GIVEN a screen reader user
+WHEN the modal opens
+THEN the title and close action are announced
+
+## Notes
+Reference docs:
+- https://github.com/example/repo/pull/20
+- https://wiki.example.internal/display/CRM/Modal+Guidelines

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "/home/dujavi/tooned/packages/cli/dist/cli.js"
+      }
+    ]
+  }
+}

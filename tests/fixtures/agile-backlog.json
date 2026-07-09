@@ -1,0 +1,16 @@
+{
+  "maxResults": 50,
+  "startAt": 0,
+  "total": 2,
+  "isLast": true,
+  "issues": [
+    {
+      "id": "1100",
+      "key": "CRM-100"
+    },
+    {
+      "id": "1101",
+      "key": "CRM-1006"
+    }
+  ]
+}

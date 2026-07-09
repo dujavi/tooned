@@ -1,0 +1,20 @@
+{
+  "name": "tooned",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r --parallel run dev",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint",
+    "generate:skill": "pnpm --filter @tooned/cli run build && node scripts/generate-skill.mjs",
+    "generate:skill:check": "pnpm --filter @tooned/cli run build && node scripts/generate-skill.mjs --check"
+  },
+  "devDependencies": {
+    "@tooned/cli": "workspace:*"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

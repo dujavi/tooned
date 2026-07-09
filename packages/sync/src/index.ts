@@ -1,0 +1,50 @@
+export {
+  getDb,
+  closeDb,
+  getSyncStateValue,
+  setSyncStateValue,
+  deleteSyncStateValue,
+  getStoryCount,
+  listStories,
+  getStoryByKey,
+  getStoryCommits,
+  searchStories,
+  searchRefs,
+  getStoryRefs,
+  getStoryComments,
+  getStoryHistory,
+  listStoriesWithMetrics,
+  getStoryChildren,
+  replaceStoryCommits,
+  getMigrationVersion,
+  getStoryEnrichment,
+  listStoryEnrichments,
+  listEnrichmentsForStories,
+  upsertStoryEnrichment,
+  type CommitRow,
+  type CommitUpsertInput,
+  type EnrichmentRow,
+  type EnrichmentType,
+  type RefSearchRow,
+  type SearchResultRow,
+  type StoryFilters,
+  type StoryHistoryRow,
+  type StoryListRow,
+  type Db,
+} from './db.js';
+export { runMigrations, ensureDataDir, CURRENT_MIGRATION_VERSION } from './migrate.js';
+export { runSync, type SyncRunResult, type SyncRunOptions } from './pipeline.js';
+export { enrichStoryCommits } from './vcs-enrich.js';
+export {
+  enrichStory,
+  getStorySummary,
+  queueStoryEnrichmentOnSync,
+  SUPPORTED_ENRICHMENT_TYPES,
+} from './enrichment.js';
+export {
+  extractSprintRefs,
+  listStoriesForSprint,
+  listBacklogStories,
+  type SprintRef,
+  type SprintStory,
+} from './sprints.js';

@@ -1,0 +1,6 @@
+syncMeta:
+  lastSync: "2026-07-09T20:00:00.000Z"
+  dataAgeSeconds: 60
+  syncStatus: idle
+search: "0 stories found for \"modal\""
+help[1]: "Run `tooned search \"<query>\" --in all` to broaden scope"

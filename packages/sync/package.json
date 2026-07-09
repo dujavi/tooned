@@ -1,0 +1,31 @@
+{
+  "name": "@tooned/sync",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b && node scripts/copy-migrations.mjs",
+    "dev": "tsc -b --watch",
+    "test": "vitest run",
+    "lint": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@tooned/bitbucket": "workspace:*",
+    "@tooned/core": "workspace:*",
+    "@tooned/enrich": "workspace:*",
+    "@tooned/github": "workspace:*",
+    "@tooned/jira": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}
