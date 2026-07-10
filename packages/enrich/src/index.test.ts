@@ -36,7 +36,7 @@ describe('createEnrichmentProvider', () => {
         jira: { projectKey: 'CRM', boardId: 1, storyIssueType: 'Story' },
         fields: {},
         dodTemplates: [{ team: 'default', expectedSubtasks: ['Test'] }],
-        vcs: { urlDomains: { form: [], confluence: [] } },
+        vcs: { urlDomains: { form: [], confluence: [] }, accounts: [], repos: [] },
         confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
         parsing: {},
       },

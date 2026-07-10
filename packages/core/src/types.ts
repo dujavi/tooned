@@ -43,8 +43,24 @@ export interface VcsCommit {
 
 export interface VcsClient {
   readonly provider: VcsProvider;
+  readonly accountId: string;
   getPullRequest(input: { repository: string; id: number }): Promise<VcsPullRequest>;
   getCommit(input: { repository: string; hash: string }): Promise<VcsCommit>;
   resolveShortSha(input: { repository: string; shortSha: string }): Promise<string | null>;
   getDiffstat(input: { repository: string; hash: string }): Promise<VcsDiffstat | null>;
+  listRepositories(scope: string): Promise<VcsRepository[]>;
+  listSourcePaths(input: { repository: string; ref?: string }): Promise<VcsSourcePath[]>;
+  getSourceFile(input: { repository: string; path: string; ref?: string }): Promise<string>;
+}
+
+export interface VcsRepository {
+  slug: string;
+  fullName: string;
+  name: string;
+  defaultBranch: string | null;
+}
+
+export interface VcsSourcePath {
+  path: string;
+  type: 'file' | 'directory';
 }

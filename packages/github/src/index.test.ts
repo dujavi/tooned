@@ -27,7 +27,7 @@ const baseConfig: Config = {
     jira: { projectKey: 'CRM', boardId: 1, storyIssueType: 'Story' },
     fields: {},
     dodTemplates: [],
-    vcs: { urlDomains: { form: [], confluence: [] } },
+    vcs: { urlDomains: { form: [], confluence: [] }, accounts: [], repos: [] },
     confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
     parsing: {},
   },
@@ -101,5 +101,78 @@ describe('github client', () => {
       linesRemoved: 3,
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('lists repositories and source files', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              name: 'tools',
+              full_name: 'acme/tools',
+              default_branch: 'main',
+            },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            object: { sha: 'tree-sha' },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            tree: [
+              { path: 'src', type: 'tree' },
+              { path: 'src/index.ts', type: 'blob' },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            content: Buffer.from('export const ok = true;\n', 'utf8').toString('base64'),
+            encoding: 'base64',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      );
+
+    const client = createGitHubClient(baseConfig);
+    expect(client).not.toBeNull();
+    if (!client) {
+      return;
+    }
+
+    const repositories = await client.listRepositories('acme');
+    expect(repositories).toEqual([
+      {
+        slug: 'tools',
+        fullName: 'acme/tools',
+        name: 'tools',
+        defaultBranch: 'main',
+      },
+    ]);
+
+    const paths = await client.listSourcePaths({ repository: 'acme/tools', ref: 'main' });
+    expect(paths).toEqual([
+      { path: 'src', type: 'directory' },
+      { path: 'src/index.ts', type: 'file' },
+    ]);
+
+    const content = await client.getSourceFile({
+      repository: 'acme/tools',
+      path: 'src/index.ts',
+      ref: 'main',
+    });
+    expect(content).toBe('export const ok = true;\n');
   });
 });

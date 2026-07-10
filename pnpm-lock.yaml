@@ -30,12 +30,18 @@ importers:
 
   packages/cli:
     dependencies:
+      '@tooned/bitbucket':
+        specifier: workspace:*
+        version: link:../bitbucket
       '@tooned/confluence':
         specifier: workspace:*
         version: link:../confluence
       '@tooned/core':
         specifier: workspace:*
         version: link:../core
+      '@tooned/github':
+        specifier: workspace:*
+        version: link:../github
       '@tooned/jira':
         specifier: workspace:*
         version: link:../jira

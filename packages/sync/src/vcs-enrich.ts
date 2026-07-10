@@ -1,7 +1,8 @@
-import { createBitbucketClient } from '@tooned/bitbucket';
-import { createGitHubClient } from '@tooned/github';
+import '@tooned/bitbucket';
+import '@tooned/github';
 import {
   extractShortShas,
+  getDefaultVcsClient,
   parseVcsUrl,
   type Config,
   type VcsClient,
@@ -20,8 +21,8 @@ interface ResolvedCommitTarget {
 
 function providerClientMap(config: Config): Record<VcsProvider, VcsClient | null> {
   return {
-    bitbucket: createBitbucketClient(config),
-    github: createGitHubClient(config),
+    bitbucket: getDefaultVcsClient(config, 'bitbucket'),
+    github: getDefaultVcsClient(config, 'github'),
   };
 }
 

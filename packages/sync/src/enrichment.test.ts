@@ -37,7 +37,7 @@ function makeConfig(dataDir: string): Config {
         sprint: '10020',
       },
       dodTemplates: [{ team: 'default', expectedSubtasks: ['Test'] }],
-      vcs: { urlDomains: { form: [], confluence: [] } },
+      vcs: { urlDomains: { form: [], confluence: [] }, accounts: [], repos: [] },
       confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
       parsing: {},
     },

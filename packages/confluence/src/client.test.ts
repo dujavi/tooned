@@ -39,7 +39,7 @@ describe('createConfluenceClient searchCql', () => {
         jira: { projectKey: 'CRM', boardId: 1, storyIssueType: 'Story' },
         fields: {},
         dodTemplates: [],
-        vcs: { urlDomains: { form: [], confluence: [] } },
+        vcs: { urlDomains: { form: [], confluence: [] }, accounts: [], repos: [] },
         confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 1024 },
         parsing: {},
       },

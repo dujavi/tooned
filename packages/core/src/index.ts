@@ -40,5 +40,26 @@ export type {
   VcsPullRequest,
   VcsCommit,
   VcsDiffstat,
+  VcsRepository,
+  VcsSourcePath,
 } from './types.js';
 export { parseVcsUrl, extractShortShas, type ParsedVcsUrl } from './vcs-url.js';
+export {
+  VcsConfigSchema,
+  VcsAccountSchema,
+  VcsRepoTargetSchema,
+  synthesizeLegacyVcsAccounts,
+  resolveVcsAccounts,
+  summarizeVcsRepoTargets,
+  type VcsConfig,
+  type VcsAccountConfig,
+  type VcsRepoTarget,
+  type ResolvedVcsAccount,
+} from './vcs-config.js';
+export {
+  registerVcsClientFactories,
+  getResolvedVcsAccounts,
+  getVcsClient,
+  getDefaultVcsClient,
+  type VcsClientFactory,
+} from './vcs-clients.js';

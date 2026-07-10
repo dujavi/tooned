@@ -4,8 +4,13 @@ import { resolve } from 'node:path';
 import {
   jqlMatchesExpected,
   confluenceConfigWarnings,
+  getResolvedVcsAccounts,
+  getVcsClient,
+  summarizeVcsRepoTargets,
   type Config,
 } from '@tooned/core';
+import '@tooned/bitbucket';
+import '@tooned/github';
 import {
   createJiraClient,
   JiraError,
@@ -74,30 +79,78 @@ function checkConfluence(config: Config): DoctorCheck {
   };
 }
 
-function checkBitbucket(config: Config): DoctorCheck {
-  const hasUsername = Boolean(config.BITBUCKET_USERNAME);
-  const hasToken = Boolean(config.BITBUCKET_TOKEN);
+async function checkVcs(config: Config): Promise<DoctorCheck> {
+  const accounts = getResolvedVcsAccounts(config);
+  const repoSummary = summarizeVcsRepoTargets(config.project.vcs.repos);
 
-  if (hasUsername && hasToken) {
+  if (accounts.length === 0) {
     return {
-      name: 'bitbucket',
-      status: 'pass',
-      message: 'Bitbucket credentials configured',
-    };
-  }
-
-  if (hasUsername || hasToken) {
-    return {
-      name: 'bitbucket',
+      name: 'vcs',
       status: 'warn',
-      message: 'Bitbucket partially configured (optional until Phase 3)',
+      message: `No VCS accounts configured (${repoSummary})`,
     };
   }
+
+  const accountStatuses: string[] = [];
+  let probeSuccesses = 0;
+  let probeFailures = 0;
+
+  for (const account of accounts) {
+    if (!account.configured) {
+      accountStatuses.push(`${account.id}(${account.provider}): credentials missing`);
+      continue;
+    }
+
+    const client = getVcsClient(config, account.id);
+    if (!client) {
+      accountStatuses.push(`${account.id}(${account.provider}): client unavailable`);
+      continue;
+    }
+
+    try {
+      if (account.provider === 'bitbucket') {
+        const scope = account.workspace ?? config.BITBUCKET_WORKSPACE ?? '';
+        if (!scope) {
+          accountStatuses.push(`${account.id}(bitbucket): workspace not set`);
+          continue;
+        }
+        await client.listRepositories(scope);
+      } else {
+        const scope = account.org;
+        if (scope) {
+          await client.listRepositories(scope);
+        } else {
+          const response = await fetch('https://api.github.com/user', {
+            headers: {
+              Authorization: `Bearer ${account.token}`,
+              Accept: 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+            },
+          });
+          if (!response.ok) {
+            throw new Error(`GitHub auth probe failed (${response.status})`);
+          }
+        }
+      }
+      accountStatuses.push(`${account.id}(${account.provider}): ok`);
+      probeSuccesses += 1;
+    } catch {
+      accountStatuses.push(`${account.id}(${account.provider}): auth probe failed`);
+      probeFailures += 1;
+    }
+  }
+
+  const status =
+    probeSuccesses > 0 && probeFailures === 0
+      ? 'pass'
+      : probeSuccesses > 0
+        ? 'warn'
+        : 'warn';
 
   return {
-    name: 'bitbucket',
-    status: 'warn',
-    message: 'Bitbucket credentials not set (optional until Phase 3)',
+    name: 'vcs',
+    status,
+    message: `${accountStatuses.join('; ')} | repos: ${repoSummary}`,
   };
 }
 
@@ -262,7 +315,7 @@ export async function runDoctor(verbose: boolean): Promise<number> {
     checkConfluence(config),
     checkDataDir(config.TOONED_DATA_DIR),
     await checkPort(config),
-    checkBitbucket(config),
+    await checkVcs(config),
   ];
 
   const result: DoctorResult = {

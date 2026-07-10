@@ -33,6 +33,24 @@ vcs:
   urlDomains:
     form: []
     confluence: []
+  # Multi-account VCS (optional — legacy BITBUCKET_* / GITHUB_TOKEN still work when omitted)
+  # accounts:
+  #   - id: bb-main
+  #     provider: bitbucket
+  #     workspace: my-workspace
+  #     usernameEnv: BITBUCKET_USERNAME
+  #     tokenEnv: BITBUCKET_TOKEN
+  #   - id: gh-org
+  #     provider: github
+  #     org: my-github-org
+  #     tokenEnv: GITHUB_TOKEN
+  # repos:
+  #   - account: bb-main
+  #     scope: workspace
+  #   - account: gh-org
+  #     slug: my-repo
+  accounts: []
+  repos: []
 
 # Confluence page crawl settings (uses same ATLASSIAN_* credentials as Jira).
 confluence:

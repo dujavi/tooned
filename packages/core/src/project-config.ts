@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
+import { VcsConfigSchema } from './vcs-config.js';
 
 const DodTemplateSchema = z.object({
   team: z.string().min(1),
@@ -22,21 +23,11 @@ export const ProjectConfigSchema = z.object({
       expectedSubtasks: ['Test', 'Evaluate DoD'],
     },
   ]),
-  vcs: z
-    .object({
-      bitbucket: z
-        .object({
-          workspace: z.string().min(1).optional(),
-        })
-        .optional(),
-      urlDomains: z
-        .object({
-          form: z.array(z.string()).default([]),
-          confluence: z.array(z.string()).default([]),
-        })
-        .default({ form: [], confluence: [] }),
-    })
-    .default({ urlDomains: { form: [], confluence: [] } }),
+  vcs: VcsConfigSchema.default({
+    urlDomains: { form: [], confluence: [] },
+    accounts: [],
+    repos: [],
+  }),
   confluence: z
     .object({
       mode: z.enum(['all', 'spaces']).default('all'),

@@ -20,9 +20,10 @@
     "lint": "tsc -b --noEmit"
   },
   "dependencies": {
-    "@tooned/confluence": "workspace:*",
+    "@tooned/bitbucket": "workspace:*",
     "@tooned/confluence": "workspace:*",
     "@tooned/core": "workspace:*",
+    "@tooned/github": "workspace:*",
     "@tooned/jira": "workspace:*",
     "@tooned/service": "workspace:*",
     "@tooned/sync": "workspace:*",

@@ -1,4 +1,12 @@
-import type { Config, VcsClient, VcsCommit, VcsDiffstat, VcsPullRequest } from '@tooned/core';
+import type {
+  Config,
+  VcsClient,
+  VcsCommit,
+  VcsDiffstat,
+  VcsRepository,
+} from '@tooned/core';
+import { registerVcsClientFactories } from '@tooned/core';
+import type { ResolvedVcsAccount } from '@tooned/core';
 
 export class GitHubError extends Error {
   constructor(
@@ -8,6 +16,12 @@ export class GitHubError extends Error {
     super(message);
     this.name = 'GitHubError';
   }
+}
+
+export interface GitHubAuth {
+  accountId: string;
+  token: string;
+  org?: string;
 }
 
 interface GitHubPullRequestResponse {
@@ -40,24 +54,50 @@ interface GitHubCommitResponse {
   files?: unknown[];
 }
 
+interface GitHubRepositoryResponse {
+  name: string;
+  full_name: string;
+  default_branch?: string | null;
+}
+
+interface GitHubTreeResponse {
+  tree?: Array<{
+    path?: string;
+    type?: string;
+  }>;
+}
+
+interface GitHubContentResponse {
+  content?: string;
+  encoding?: string;
+}
+
+interface GitHubRefResponse {
+  object?: {
+    sha?: string;
+  };
+}
+
 function splitRepository(repository: string): { owner: string; repo: string } {
   const [owner = '', repo = ''] = repository.split('/');
   return { owner, repo };
 }
 
-function authHeader(config: Config): string {
-  return `Bearer ${config.GITHUB_TOKEN ?? ''}`;
+function authHeader(auth: GitHubAuth): string {
+  return `Bearer ${auth.token}`;
 }
 
-async function githubFetch<T>(config: Config, path: string): Promise<T> {
-  const url = `https://api.github.com${path}`;
+async function githubFetch<T>(auth: GitHubAuth, path: string, init?: RequestInit): Promise<T> {
+  const url = path.startsWith('http') ? path : `https://api.github.com${path}`;
   let response: Response;
   try {
     response = await fetch(url, {
+      ...init,
       headers: {
         Accept: 'application/vnd.github+json',
-        Authorization: authHeader(config),
+        Authorization: authHeader(auth),
         'X-GitHub-Api-Version': '2022-11-28',
+        ...(init?.headers ?? {}),
       },
     });
   } catch (error) {
@@ -66,7 +106,7 @@ async function githubFetch<T>(config: Config, path: string): Promise<T> {
   }
 
   if (response.status === 401 || response.status === 403) {
-    throw new GitHubError('GitHub authentication failed — check GITHUB_TOKEN', response.status);
+    throw new GitHubError('GitHub authentication failed — check account token', response.status);
   }
 
   if (!response.ok) {
@@ -94,30 +134,109 @@ function normalizeDiffstat(commit: GitHubCommitResponse): VcsDiffstat | null {
   };
 }
 
-export function isGitHubConfigured(config: Config): boolean {
-  return Boolean(config.GITHUB_TOKEN);
+async function paginateRepositories(auth: GitHubAuth, org: string): Promise<GitHubRepositoryResponse[]> {
+  const repositories: GitHubRepositoryResponse[] = [];
+  let page = 1;
+  for (;;) {
+    const batch = await githubFetch<GitHubRepositoryResponse[]>(
+      auth,
+      `/orgs/${encodeURIComponent(org)}/repos?per_page=100&page=${page}`,
+    );
+    repositories.push(...batch);
+    if (batch.length < 100) {
+      break;
+    }
+    page += 1;
+  }
+  return repositories;
 }
 
-export function createGitHubClient(config: Config): VcsClient | null {
-  if (!isGitHubConfigured(config)) {
+async function resolveTreeSha(auth: GitHubAuth, repository: string, ref: string): Promise<string> {
+  const { owner, repo } = splitRepository(repository);
+  const refResponse = await githubFetch<GitHubRefResponse>(
+    auth,
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/ref/heads/${encodeURIComponent(ref)}`,
+  );
+  const sha = refResponse.object?.sha;
+  if (!sha) {
+    throw new GitHubError(`Could not resolve ref ${ref} for ${repository}`);
+  }
+  return sha;
+}
+
+export function createGitHubClientFromAccount(account: ResolvedVcsAccount): VcsClient | null {
+  if (account.provider !== 'github' || !account.token) {
     return null;
   }
+  return createGitHubClientFromAuth({
+    accountId: account.id,
+    token: account.token,
+    org: account.org,
+  });
+}
 
+export function createGitHubClientFromAuth(auth: GitHubAuth): VcsClient {
   const getCommitResponse = async (input: { repository: string; hash: string }): Promise<GitHubCommitResponse> => {
     const { owner, repo } = splitRepository(input.repository);
     return githubFetch<GitHubCommitResponse>(
-      config,
+      auth,
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(input.hash)}`,
     );
   };
 
   return {
     provider: 'github',
+    accountId: auth.accountId,
 
-    async getPullRequest(input): Promise<VcsPullRequest> {
+    async listRepositories(scope) {
+      const repositories = await paginateRepositories(auth, scope);
+      return repositories.map(
+        (repo): VcsRepository => ({
+          slug: repo.name,
+          fullName: repo.full_name,
+          name: repo.name,
+          defaultBranch: repo.default_branch ?? null,
+        }),
+      );
+    },
+
+    async listSourcePaths(input) {
+      const { owner, repo } = splitRepository(input.repository);
+      const ref = input.ref ?? 'main';
+      const treeSha = await resolveTreeSha(auth, input.repository, ref);
+      const tree = await githubFetch<GitHubTreeResponse>(
+        auth,
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(treeSha)}?recursive=1`,
+      );
+      return (tree.tree ?? [])
+        .filter((entry) => typeof entry.path === 'string')
+        .map((entry) => ({
+          path: entry.path!,
+          type: entry.type === 'tree' ? 'directory' : 'file',
+        }));
+    },
+
+    async getSourceFile(input) {
+      const { owner, repo } = splitRepository(input.repository);
+      const ref = input.ref ? `?ref=${encodeURIComponent(input.ref)}` : '';
+      const encodedPath = input.path
+        .split('/')
+        .map((segment) => encodeURIComponent(segment))
+        .join('/');
+      const content = await githubFetch<GitHubContentResponse>(
+        auth,
+        `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}${ref}`,
+      );
+      if (!content.content || content.encoding !== 'base64') {
+        return '';
+      }
+      return Buffer.from(content.content, 'base64').toString('utf8');
+    },
+
+    async getPullRequest(input) {
       const { owner, repo } = splitRepository(input.repository);
       const pullRequest = await githubFetch<GitHubPullRequestResponse>(
-        config,
+        auth,
         `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${input.id}`,
       );
       return {
@@ -143,7 +262,7 @@ export function createGitHubClient(config: Config): VcsClient | null {
       };
     },
 
-    async resolveShortSha(input): Promise<string | null> {
+    async resolveShortSha(input) {
       try {
         const commit = await getCommitResponse({
           repository: input.repository,
@@ -158,9 +277,27 @@ export function createGitHubClient(config: Config): VcsClient | null {
       }
     },
 
-    async getDiffstat(input): Promise<VcsDiffstat | null> {
+    async getDiffstat(input) {
       const commit = await getCommitResponse(input);
       return normalizeDiffstat(commit);
     },
   };
 }
+
+export function isGitHubConfigured(config: Config): boolean {
+  return Boolean(config.GITHUB_TOKEN);
+}
+
+export function createGitHubClient(config: Config): VcsClient | null {
+  if (!isGitHubConfigured(config)) {
+    return null;
+  }
+  return createGitHubClientFromAuth({
+    accountId: 'default-github',
+    token: config.GITHUB_TOKEN!,
+  });
+}
+
+registerVcsClientFactories({
+  github: createGitHubClientFromAccount,
+});

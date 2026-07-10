@@ -27,7 +27,12 @@ const baseConfig: Config = {
     jira: { projectKey: 'CRM', boardId: 1, storyIssueType: 'Story' },
     fields: {},
     dodTemplates: [],
-    vcs: { bitbucket: { workspace: 'workspace' }, urlDomains: { form: [], confluence: [] } },
+    vcs: {
+      bitbucket: { workspace: 'workspace' },
+      urlDomains: { form: [], confluence: [] },
+      accounts: [],
+      repos: [],
+    },
     confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
     parsing: {},
   },
@@ -64,7 +69,7 @@ describe('bitbucket client', () => {
             source: { commit: { hash: 'ABCDEF123456' } },
             links: { html: { href: 'https://bitbucket.org/acme/tools/pull-requests/7' } },
           }),
-          { status: 200 },
+          { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
       .mockResolvedValueOnce(
@@ -76,7 +81,7 @@ describe('bitbucket client', () => {
             author: { raw: 'Dev User <dev@example.com>' },
             links: { html: { href: 'https://bitbucket.org/acme/tools/commits/ABCDEF123456' } },
           }),
-          { status: 200 },
+          { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       )
       .mockResolvedValueOnce(
@@ -84,7 +89,7 @@ describe('bitbucket client', () => {
           JSON.stringify({
             values: [{ lines_added: 4, lines_removed: 2 }],
           }),
-          { status: 200 },
+          { status: 200, headers: { 'content-type': 'application/json' } },
         ),
       );
 
@@ -105,5 +110,84 @@ describe('bitbucket client', () => {
       linesRemoved: 2,
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('lists repositories and source files', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            values: [
+              {
+                slug: 'tools',
+                full_name: 'acme/tools',
+                name: 'tools',
+                mainbranch: { name: 'main' },
+              },
+            ],
+            next: null,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            values: [
+              { path: 'src', type: 'commit_directory' },
+              { path: 'README.md', type: 'commit_file' },
+            ],
+            next: null,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            values: [{ path: 'index.ts', type: 'commit_file' }],
+            next: null,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response('export const ok = true;\n', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        }),
+      );
+
+    const client = createBitbucketClient(baseConfig);
+    expect(client).not.toBeNull();
+    if (!client) {
+      return;
+    }
+
+    const repositories = await client.listRepositories('acme');
+    expect(repositories).toEqual([
+      {
+        slug: 'tools',
+        fullName: 'acme/tools',
+        name: 'tools',
+        defaultBranch: 'main',
+      },
+    ]);
+
+    const paths = await client.listSourcePaths({ repository: 'acme/tools', ref: 'main' });
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        { path: 'src', type: 'directory' },
+        { path: 'README.md', type: 'file' },
+        { path: 'index.ts', type: 'file' },
+      ]),
+    );
+
+    const content = await client.getSourceFile({
+      repository: 'acme/tools',
+      path: 'src/index.ts',
+      ref: 'main',
+    });
+    expect(content).toBe('export const ok = true;\n');
   });
 });

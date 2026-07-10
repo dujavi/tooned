@@ -6,6 +6,7 @@ import {
   type ProjectConfig,
   suggestConfluenceHosts,
 } from './project-config.js';
+import { synthesizeLegacyVcsAccounts } from './vcs-config.js';
 
 const optionalString = z.preprocess(
   (value) => (value === '' || value === undefined ? undefined : value),
@@ -84,10 +85,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     project.vcs.urlDomains.confluence,
     parsedEnv.ATLASSIAN_BASE_URL,
   );
+  const synthesizedAccounts = synthesizeLegacyVcsAccounts({
+    accounts: project.vcs.accounts,
+    bitbucketWorkspace,
+    env,
+  });
   const projectWithDefaults: ProjectConfig = {
     ...project,
     vcs: {
       ...project.vcs,
+      accounts: synthesizedAccounts,
       urlDomains: {
         ...project.vcs.urlDomains,
         confluence: confluenceHosts,
