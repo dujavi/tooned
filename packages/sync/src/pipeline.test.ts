@@ -10,6 +10,12 @@ const mockCreateJiraClient = vi.fn<() => JiraClient>();
 const mockStoryFields = vi.fn(() => ['summary', 'status', 'issuetype', 'parent', 'updated']);
 const mockEnrichStoryCommits = vi.fn(async () => undefined);
 const mockQueueStoryEnrichmentOnSync = vi.fn(() => undefined);
+const mockRunConfluenceSync = vi.fn(async () => ({
+  pagesProcessed: 0,
+  pagesFailed: 0,
+  retaggedRefs: 0,
+  bootstrapComplete: true,
+}));
 
 vi.mock('@tooned/jira', async () => {
   const actual = await vi.importActual<typeof import('@tooned/jira')>('@tooned/jira');
@@ -26,6 +32,11 @@ vi.mock('./vcs-enrich.js', () => ({
 
 vi.mock('./enrichment.js', () => ({
   queueStoryEnrichmentOnSync: mockQueueStoryEnrichmentOnSync,
+}));
+
+vi.mock('./confluence-sync.js', () => ({
+  runConfluenceSync: mockRunConfluenceSync,
+  CONFLUENCE_BOOTSTRAP_COMPLETE_KEY: 'confluenceBootstrapComplete',
 }));
 
 const { runSync } = await import('./pipeline.js');
@@ -63,6 +74,7 @@ function makeConfig(dataDir: string): Config {
       },
       dodTemplates: [{ team: 'default', expectedSubtasks: ['Test'] }],
       vcs: { urlDomains: { form: [], confluence: [] } },
+      confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
       parsing: {},
     },
     fieldMap: {

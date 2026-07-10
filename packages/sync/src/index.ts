@@ -21,6 +21,18 @@ export {
   listStoryEnrichments,
   listEnrichmentsForStories,
   upsertStoryEnrichment,
+  getConfluencePageCount,
+  getPageById,
+  listPages,
+  upsertConfluencePage,
+  replacePageAttachments,
+  replacePageRefs,
+  rebuildConfluenceSearchRow,
+  retagWikiExtractedRefs,
+  type ConfluencePageRow,
+  type ConfluencePageUpsertInput,
+  type ConfluenceAttachmentUpsertInput,
+  type PageRefUpsertInput,
   type CommitRow,
   type CommitUpsertInput,
   type EnrichmentRow,
@@ -34,6 +46,14 @@ export {
 } from './db.js';
 export { runMigrations, ensureDataDir, CURRENT_MIGRATION_VERSION } from './migrate.js';
 export { runSync, type SyncRunResult, type SyncRunOptions } from './pipeline.js';
+export {
+  runConfluenceSync,
+  CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,
+  CONFLUENCE_BOOTSTRAP_CHECKPOINT_KEY,
+  CONFLUENCE_LAST_SYNC_KEY,
+  type ConfluenceSyncOptions,
+  type ConfluenceSyncResult,
+} from './confluence-sync.js';
 export { enrichStoryCommits } from './vcs-enrich.js';
 export {
   enrichStory,

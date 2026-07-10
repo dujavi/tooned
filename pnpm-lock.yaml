@@ -30,6 +30,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@tooned/confluence':
+        specifier: workspace:*
+        version: link:../confluence
       '@tooned/core':
         specifier: workspace:*
         version: link:../core
@@ -48,6 +51,25 @@ importers:
       dotenv:
         specifier: ^16.5.0
         version: 16.6.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.2
+        version: 3.2.7(@types/node@22.20.1)(yaml@2.9.0)
+
+  packages/confluence:
+    dependencies:
+      '@tooned/core':
+        specifier: workspace:*
+        version: link:../core
+      '@tooned/jira':
+        specifier: workspace:*
+        version: link:../jira
     devDependencies:
       '@types/node':
         specifier: ^22.15.3
@@ -168,6 +190,9 @@ importers:
       '@tooned/bitbucket':
         specifier: workspace:*
         version: link:../bitbucket
+      '@tooned/confluence':
+        specifier: workspace:*
+        version: link:../confluence
       '@tooned/core':
         specifier: workspace:*
         version: link:../core

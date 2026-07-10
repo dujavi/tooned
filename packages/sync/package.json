@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@tooned/bitbucket": "workspace:*",
+    "@tooned/confluence": "workspace:*",
     "@tooned/core": "workspace:*",
     "@tooned/enrich": "workspace:*",
     "@tooned/github": "workspace:*",

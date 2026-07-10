@@ -1,4 +1,4 @@
-import { closeDb, getDb, getStoryCount } from '@tooned/sync';
+import { closeDb, getDb, getConfluencePageCount, getStoryCount } from '@tooned/sync';
 import { fetchStatus } from '../client.js';
 import { formatToon } from '../output.js';
 import { handleServiceError, loadConfigOrEmitError } from './shared.js';
@@ -12,11 +12,13 @@ export async function runStatus(): Promise<number> {
     const status = await fetchStatus(config);
     const db = getDb(config.TOONED_DATA_DIR);
     const storyCount = getStoryCount(db);
+    const pageCount = getConfluencePageCount(db);
     closeDb();
     console.log(
       formatToon(status.syncMeta, {
         serviceRunning: true,
         storyCount,
+        pageCount,
         help: ['Run `tooned sprint current --workload` for current capacity'],
       }),
     );

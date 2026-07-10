@@ -19,6 +19,10 @@ import {
 } from './db.js';
 import { queueStoryEnrichmentOnSync } from './enrichment.js';
 import { enrichStoryCommits } from './vcs-enrich.js';
+import {
+  CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,
+  runConfluenceSync,
+} from './confluence-sync.js';
 
 const SYNC_KEY = 'sync';
 const LAST_SYNC_KEY = 'lastSync';
@@ -568,6 +572,13 @@ async function executeSync(config: Config, options: SyncRunOptions = {}): Promis
       });
       linkedBugCount += 1;
       writeAuditBlob(config.TOONED_DATA_DIR, bugIssue);
+    }
+
+    const confluenceBootstrapComplete = force
+      ? false
+      : (getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false);
+    if (force || !confluenceBootstrapComplete) {
+      await runConfluenceSync(db, config, { force });
     }
 
     const completedAt = nowIso();

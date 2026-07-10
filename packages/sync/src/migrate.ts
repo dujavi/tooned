@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export const CURRENT_MIGRATION_VERSION = 4;
+export const CURRENT_MIGRATION_VERSION = 5;
 
 export type Db = DatabaseSync;
 

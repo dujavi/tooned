@@ -554,4 +554,249 @@ export function upsertStoryEnrichment(
   ).run(enrichment.storyKey, enrichment.type, enrichment.contentHash, enrichment.content, enrichment.createdAt);
 }
 
+export interface ConfluencePageRow {
+  pageId: string;
+  spaceKey: string | null;
+  title: string | null;
+  url: string | null;
+  bodyMd: string | null;
+  labelsJson: string | null;
+  ancestorTitles: string | null;
+  version: number | null;
+  sourceUpdatedAt: string | null;
+  syncedAt: string | null;
+  payload: string | null;
+}
+
+export interface ConfluencePageUpsertInput {
+  pageId: string;
+  spaceKey: string | null;
+  title: string;
+  url: string;
+  bodyMd: string;
+  labelsJson: string;
+  ancestorTitles: string;
+  version: number | null;
+  sourceUpdatedAt: string | null;
+  syncedAt: string;
+  payload: string;
+}
+
+export interface ConfluenceAttachmentUpsertInput {
+  id: string;
+  pageId: string;
+  filename: string;
+  mimeType: string | null;
+  textContent: string | null;
+  syncedAt: string;
+}
+
+export interface PageRefUpsertInput {
+  id: string;
+  pageId: string;
+  issueKey: string | null;
+  url: string | null;
+  domain: string | null;
+}
+
+export function upsertConfluencePage(db: Db, page: ConfluencePageUpsertInput): void {
+  db.prepare(
+    `INSERT INTO confluence_pages (
+      page_id, space_key, title, url, body_md, labels_json, ancestor_titles,
+      version, source_updated_at, synced_at, payload
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(page_id) DO UPDATE SET
+      space_key = excluded.space_key,
+      title = excluded.title,
+      url = excluded.url,
+      body_md = excluded.body_md,
+      labels_json = excluded.labels_json,
+      ancestor_titles = excluded.ancestor_titles,
+      version = excluded.version,
+      source_updated_at = excluded.source_updated_at,
+      synced_at = excluded.synced_at,
+      payload = excluded.payload`,
+  ).run(
+    page.pageId,
+    page.spaceKey,
+    page.title,
+    page.url,
+    page.bodyMd,
+    page.labelsJson,
+    page.ancestorTitles,
+    page.version,
+    page.sourceUpdatedAt,
+    page.syncedAt,
+    page.payload,
+  );
+}
+
+export function replacePageAttachments(db: Db, pageId: string, attachments: ConfluenceAttachmentUpsertInput[]): void {
+  db.prepare('DELETE FROM confluence_attachments WHERE page_id = ?').run(pageId);
+  const insert = db.prepare(
+    `INSERT INTO confluence_attachments (id, page_id, filename, mime_type, text_content, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  for (const attachment of attachments) {
+    insert.run(
+      attachment.id,
+      attachment.pageId,
+      attachment.filename,
+      attachment.mimeType,
+      attachment.textContent,
+      attachment.syncedAt,
+    );
+  }
+}
+
+export function replacePageRefs(db: Db, pageId: string, refs: PageRefUpsertInput[]): void {
+  db.prepare('DELETE FROM page_refs WHERE page_id = ?').run(pageId);
+  const insert = db.prepare(
+    'INSERT INTO page_refs (id, page_id, issue_key, url, domain) VALUES (?, ?, ?, ?, ?)',
+  );
+  for (const ref of refs) {
+    insert.run(ref.id, ref.pageId, ref.issueKey, ref.url, ref.domain);
+  }
+}
+
+export function getPageById(db: Db, pageId: string): ConfluencePageRow | null {
+  const row = db
+    .prepare(
+      `SELECT
+         page_id AS pageId,
+         space_key AS spaceKey,
+         title,
+         url,
+         body_md AS bodyMd,
+         labels_json AS labelsJson,
+         ancestor_titles AS ancestorTitles,
+         version,
+         source_updated_at AS sourceUpdatedAt,
+         synced_at AS syncedAt,
+         payload
+       FROM confluence_pages
+       WHERE page_id = ?`,
+    )
+    .get(pageId) as ConfluencePageRow | undefined;
+  return row ?? null;
+}
+
+export interface PageListFilters {
+  space?: string;
+  limit: number;
+}
+
+export function listPages(db: Db, filters: PageListFilters): ConfluencePageRow[] {
+  if (filters.space) {
+    return db
+      .prepare(
+        `SELECT
+           page_id AS pageId,
+           space_key AS spaceKey,
+           title,
+           url,
+           body_md AS bodyMd,
+           labels_json AS labelsJson,
+           ancestor_titles AS ancestorTitles,
+           version,
+           source_updated_at AS sourceUpdatedAt,
+           synced_at AS syncedAt,
+           payload
+         FROM confluence_pages
+         WHERE space_key = ?
+         ORDER BY source_updated_at DESC, title ASC
+         LIMIT ?`,
+      )
+      .all(filters.space, filters.limit) as unknown as ConfluencePageRow[];
+  }
+
+  return db
+    .prepare(
+      `SELECT
+         page_id AS pageId,
+         space_key AS spaceKey,
+         title,
+         url,
+         body_md AS bodyMd,
+         labels_json AS labelsJson,
+         ancestor_titles AS ancestorTitles,
+         version,
+         source_updated_at AS sourceUpdatedAt,
+         synced_at AS syncedAt,
+         payload
+       FROM confluence_pages
+       ORDER BY source_updated_at DESC, title ASC
+       LIMIT ?`,
+    )
+    .all(filters.limit) as unknown as ConfluencePageRow[];
+}
+
+export function getConfluencePageCount(db: Db): number {
+  const row = db.prepare('SELECT COUNT(*) AS count FROM confluence_pages').get() as { count: number };
+  return row.count;
+}
+
+export function rebuildConfluenceSearchRow(db: Db, pageId: string): void {
+  const page = getPageById(db, pageId);
+  if (!page) {
+    db.prepare('DELETE FROM confluence_search WHERE page_id = ?').run(pageId);
+    return;
+  }
+
+  let labels = '';
+  if (page.labelsJson) {
+    try {
+      const parsed = JSON.parse(page.labelsJson) as unknown;
+      if (Array.isArray(parsed)) {
+        labels = parsed.filter((item): item is string => typeof item === 'string').join(' ');
+      }
+    } catch {
+      labels = '';
+    }
+  }
+
+  const attachmentRows = db
+    .prepare(
+      `SELECT filename, text_content AS textContent
+       FROM confluence_attachments
+       WHERE page_id = ?
+       ORDER BY filename ASC`,
+    )
+    .all(pageId) as unknown as Array<{ filename: string | null; textContent: string | null }>;
+
+  const attachmentNames = attachmentRows
+    .map((row) => row.filename ?? '')
+    .filter(Boolean)
+    .join(' ');
+  const attachmentText = attachmentRows
+    .map((row) => row.textContent ?? '')
+    .filter(Boolean)
+    .join('\n');
+
+  db.prepare('DELETE FROM confluence_search WHERE page_id = ?').run(pageId);
+  db.prepare(
+    `INSERT INTO confluence_search (page_id, title, body_md, labels, attachment_names, attachment_text)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(
+    pageId,
+    page.title ?? '',
+    page.bodyMd ?? '',
+    labels,
+    attachmentNames,
+    attachmentText,
+  );
+}
+
+export function retagWikiExtractedRefs(db: Db): number {
+  const result = db
+    .prepare(
+      `UPDATE extracted_refs
+       SET domain = 'confluence'
+       WHERE domain = 'jira' AND url LIKE '%/wiki/%'`,
+    )
+    .run();
+  return Number(result.changes);
+}
+
 export type { Db };
