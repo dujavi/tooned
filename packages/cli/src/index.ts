@@ -61,7 +61,7 @@ const FLAG_RULES: FlagValidationRule[] = [
   { command: 'serve', path: ['serve'], flags: [] },
   { command: 'doctor', path: ['doctor'], flags: ['--verbose'] },
   { command: 'status', path: ['status'], flags: [] },
-  { command: 'sync', path: ['sync'], flags: ['--force'] },
+  { command: 'sync', path: ['sync'], flags: ['--force', '--jira', '--confluence', '--repos'] },
   { command: 'setup hooks', path: ['setup', 'hooks'], flags: [] },
   { command: 'sprint current', path: ['sprint', 'current'], flags: ['--workload'] },
   { command: 'sprint next', path: ['sprint', 'next'], flags: ['--review-pack', '--include-backlog', '--enriched'] },
@@ -215,11 +215,17 @@ program
 
 program
   .command('sync')
-  .description('Run Jira sync now')
-  .option('--force', 'Force bootstrap + delta sync')
-  .addHelpText('after', '\nExamples:\n  tooned sync\n  tooned sync --force')
-  .action(async (options: { force?: boolean }) => {
-    const exitCode = await runSyncCommand(Boolean(options.force));
+  .description('Run sync now (Jira, Confluence, and/or repos)')
+  .option('--force', 'Force bootstrap sync for selected sources')
+  .option('--jira', 'Sync Jira stories only')
+  .option('--confluence', 'Sync Confluence pages only')
+  .option('--repos', 'Sync configured repositories only')
+  .addHelpText(
+    'after',
+    '\nExamples:\n  tooned sync\n  tooned sync --force\n  tooned sync --repos --force\n  tooned sync --jira --confluence',
+  )
+  .action(async (options: { force?: boolean; jira?: boolean; confluence?: boolean; repos?: boolean }) => {
+    const exitCode = await runSyncCommand(options);
     process.exit(exitCode);
   });
 

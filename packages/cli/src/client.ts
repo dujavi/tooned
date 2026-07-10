@@ -1,4 +1,5 @@
 import type { Config, SyncMeta } from '@tooned/core';
+import type { SyncSource } from '@tooned/sync';
 
 export interface HealthResponse {
   ok: boolean;
@@ -9,6 +10,7 @@ export interface SyncResponse {
   ok: boolean;
   syncMeta: SyncMeta;
   result: {
+    sources?: SyncSource[];
     mode: string;
     bootstrapJql: string;
     bootstrapProcessed: number;
@@ -350,13 +352,19 @@ export async function fetchHealth(config: Config): Promise<HealthResponse> {
   return fetchJson<HealthResponse>(config, '/health', { signal: AbortSignal.timeout(3000) });
 }
 
-export async function triggerSync(config: Config, force: boolean): Promise<SyncResponse> {
+export async function triggerSync(
+  config: Config,
+  options: { force?: boolean; sources?: SyncSource[] } = {},
+): Promise<SyncResponse> {
   return fetchJson<SyncResponse>(config, '/sync', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ force }),
+    body: JSON.stringify({
+      force: Boolean(options.force),
+      sources: options.sources,
+    }),
     signal: AbortSignal.timeout(30_000),
   });
 }

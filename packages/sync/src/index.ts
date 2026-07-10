@@ -67,7 +67,7 @@ export {
   type Db,
 } from './db.js';
 export { runMigrations, ensureDataDir, CURRENT_MIGRATION_VERSION } from './migrate.js';
-export { runSync, type SyncRunResult, type SyncRunOptions } from './pipeline.js';
+export { runSync, type SyncRunResult, type SyncRunOptions, type SyncSource, ALL_SYNC_SOURCES, resolveSyncSources } from './pipeline.js';
 export {
   runConfluenceSync,
   CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,

@@ -39,6 +39,19 @@ vi.mock('./confluence-sync.js', () => ({
   CONFLUENCE_BOOTSTRAP_COMPLETE_KEY: 'confluenceBootstrapComplete',
 }));
 
+const mockRunRepoSync = vi.fn(async () => ({
+  reposProcessed: 0,
+  filesIndexed: 0,
+  filesSkipped: 0,
+  filesFailed: 0,
+  bootstrapComplete: true,
+}));
+
+vi.mock('./repo-sync.js', () => ({
+  runRepoSync: mockRunRepoSync,
+  CODE_BOOTSTRAP_COMPLETE_KEY: 'codeBootstrapComplete',
+}));
+
 const { runSync } = await import('./pipeline.js');
 
 function makeConfig(dataDir: string): Config {
@@ -211,5 +224,18 @@ describe('runSync parent refresh', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('syncs only selected sources', async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'tooned-sync-selective-'));
+    getDb(dataDir);
+
+    const result = await runSync(makeConfig(dataDir), { force: true, sources: ['repos'] });
+
+    expect(result.sources).toEqual(['repos']);
+    expect(result.mode).toBe('skipped');
+    expect(mockCreateJiraClient).not.toHaveBeenCalled();
+    expect(mockRunConfluenceSync).not.toHaveBeenCalled();
+    expect(mockRunRepoSync).toHaveBeenCalledTimes(1);
   });
 });

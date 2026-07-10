@@ -1,25 +1,63 @@
 import { buildSyncMeta } from '@tooned/core';
-import { runSync } from '@tooned/sync';
+import { resolveSyncSources, runSync, type SyncRunOptions, type SyncSource } from '@tooned/sync';
 import { ServiceClientError, triggerSync } from '../client.js';
 import { formatToon } from '../output.js';
 import { handleServiceError, loadConfigOrEmitError, localSyncMeta } from './shared.js';
 
-export async function runSyncCommand(force: boolean): Promise<number> {
+export interface SyncCommandOptions {
+  force?: boolean;
+  jira?: boolean;
+  confluence?: boolean;
+  repos?: boolean;
+}
+
+export function buildSyncRunOptions(options: SyncCommandOptions): SyncRunOptions {
+  const selected: SyncSource[] = [];
+  if (options.jira) selected.push('jira');
+  if (options.confluence) selected.push('confluence');
+  if (options.repos) selected.push('repos');
+
+  return {
+    force: Boolean(options.force),
+    sources: selected.length > 0 ? selected : undefined,
+  };
+}
+
+function formatSyncResult(result: {
+  sources: SyncSource[];
+  mode: string;
+  bootstrapProcessed: number;
+  deltaProcessed: number;
+  parentRefreshCount: number;
+  linkedBugCount: number;
+  lastSync: string;
+}) {
+  return {
+    sources: result.sources,
+    mode: result.mode,
+    bootstrapProcessed: result.bootstrapProcessed,
+    deltaProcessed: result.deltaProcessed,
+    parentRefreshCount: result.parentRefreshCount,
+    linkedBugCount: result.linkedBugCount,
+    lastSync: result.lastSync,
+  };
+}
+
+export async function runSyncCommand(options: SyncCommandOptions): Promise<number> {
   const config = loadConfigOrEmitError();
   if (!config) return 1;
 
+  const syncOptions = buildSyncRunOptions(options);
+  const sources = resolveSyncSources(syncOptions);
+
   try {
-    const serviceResult = await triggerSync(config, force);
+    const serviceResult = await triggerSync(config, syncOptions);
     console.log(
       formatToon(serviceResult.syncMeta, {
-        sync: {
-          mode: serviceResult.result.mode,
-          bootstrapProcessed: serviceResult.result.bootstrapProcessed,
-          deltaProcessed: serviceResult.result.deltaProcessed,
-          parentRefreshCount: serviceResult.result.parentRefreshCount,
-          linkedBugCount: serviceResult.result.linkedBugCount,
-          lastSync: serviceResult.syncMeta.lastSync ?? null,
-        },
+        sync: formatSyncResult({
+          ...serviceResult.result,
+          sources: (serviceResult.result.sources as SyncSource[] | undefined) ?? sources,
+        }),
         help: ['Run `tooned status` to confirm sync freshness'],
       }),
     );
@@ -31,17 +69,10 @@ export async function runSyncCommand(force: boolean): Promise<number> {
   }
 
   try {
-    const localResult = await runSync(config, { force });
+    const localResult = await runSync(config, syncOptions);
     console.log(
       formatToon(buildSyncMeta(localResult.lastSync, 'idle'), {
-        sync: {
-          mode: localResult.mode,
-          bootstrapProcessed: localResult.bootstrapProcessed,
-          deltaProcessed: localResult.deltaProcessed,
-          parentRefreshCount: localResult.parentRefreshCount,
-          linkedBugCount: localResult.linkedBugCount,
-          lastSync: localResult.lastSync,
-        },
+        sync: formatSyncResult(localResult),
         help: ['Run `tooned serve` for background syncing'],
       }),
     );

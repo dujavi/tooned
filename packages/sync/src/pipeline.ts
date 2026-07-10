@@ -55,18 +55,31 @@ interface StoryPayloadRecord {
   timeSpentSeconds: number | null;
 }
 
+export type SyncSource = 'jira' | 'confluence' | 'repos';
+
+export const ALL_SYNC_SOURCES: SyncSource[] = ['jira', 'confluence', 'repos'];
+
 export interface SyncRunOptions {
   force?: boolean;
+  sources?: SyncSource[];
 }
 
 export interface SyncRunResult {
-  mode: 'bootstrap+delta' | 'delta';
+  sources: SyncSource[];
+  mode: 'bootstrap+delta' | 'delta' | 'skipped';
   bootstrapJql: string;
   bootstrapProcessed: number;
   deltaProcessed: number;
   parentRefreshCount: number;
   linkedBugCount: number;
   lastSync: string;
+}
+
+export function resolveSyncSources(options: SyncRunOptions = {}): SyncSource[] {
+  if (options.sources && options.sources.length > 0) {
+    return options.sources;
+  }
+  return ALL_SYNC_SOURCES;
 }
 
 let activeSyncRun: Promise<SyncRunResult> | null = null;
@@ -425,7 +438,11 @@ export async function runSync(config: Config, options: SyncRunOptions = {}): Pro
 
 async function executeSync(config: Config, options: SyncRunOptions = {}): Promise<SyncRunResult> {
   const db = getDb(config.TOONED_DATA_DIR);
-  const client = createJiraClient(config);
+  const sources = resolveSyncSources(options);
+  const syncJira = sources.includes('jira');
+  const syncConfluence = sources.includes('confluence');
+  const syncRepos = sources.includes('repos');
+  const client = syncJira ? createJiraClient(config) : null;
   const startedAt = nowIso();
   const syncState = getSyncStateValue<SyncStateRecord>(db, SYNC_KEY) ?? {
     lastSync: null,
@@ -451,17 +468,26 @@ async function executeSync(config: Config, options: SyncRunOptions = {}): Promis
 
   try {
     const force = Boolean(options.force);
-    const bootstrapComplete = force ? false : (getSyncStateValue<boolean>(db, BOOTSTRAP_COMPLETE_KEY) ?? false);
-    const mode: SyncRunResult['mode'] = bootstrapComplete ? 'delta' : 'bootstrap+delta';
+    const forceJira = force && syncJira;
+    const forceConfluence = force && syncConfluence;
+    const forceRepos = force && syncRepos;
+    const bootstrapComplete = forceJira
+      ? false
+      : (getSyncStateValue<boolean>(db, BOOTSTRAP_COMPLETE_KEY) ?? false);
+    const mode: SyncRunResult['mode'] = syncJira
+      ? bootstrapComplete
+        ? 'delta'
+        : 'bootstrap+delta'
+      : 'skipped';
 
-    if (!bootstrapComplete) {
-      const checkpoint = force
+    if (syncJira && !bootstrapComplete) {
+      const checkpoint = forceJira
         ? null
         : getSyncStateValue<{ nextPageToken?: string | null }>(db, CHECKPOINT_KEY);
       let nextPageToken = checkpoint?.nextPageToken ?? undefined;
 
       for (;;) {
-        const page = await client.searchIssues({
+        const page = await client!.searchIssues({
           jql: bootstrapJql,
           fields,
           nextPageToken,
@@ -472,7 +498,7 @@ async function executeSync(config: Config, options: SyncRunOptions = {}): Promis
             db,
             config,
             issue,
-            client,
+            client: client!,
             mode: 'bootstrap',
             parentRefreshKeys,
             linkedBugKeys,
@@ -496,104 +522,110 @@ async function executeSync(config: Config, options: SyncRunOptions = {}): Promis
       }
     }
 
-    const baseLastSync = force ? syncState.lastSync : (getSyncStateValue<string>(db, LAST_SYNC_KEY) ?? syncState.lastSync);
-    const deltaSince = baseLastSync ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const deltaJql =
-      `project = ${quoteJqlValue(config.JIRA_PROJECT_KEY)} ` +
-      `AND issuetype in (${[
-        quoteJqlValue(config.project.jira.storyIssueType),
-        quoteJqlValue('Sub-task'),
-        quoteJqlValue('Bug'),
-      ].join(', ')}) ` +
-      `AND updated >= ${quoteJqlValue(toJqlTimestamp(deltaSince))} ORDER BY updated ASC`;
+    if (syncJira) {
+      const baseLastSync = forceJira ? syncState.lastSync : (getSyncStateValue<string>(db, LAST_SYNC_KEY) ?? syncState.lastSync);
+      const deltaSince = baseLastSync ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const deltaJql =
+        `project = ${quoteJqlValue(config.JIRA_PROJECT_KEY)} ` +
+        `AND issuetype in (${[
+          quoteJqlValue(config.project.jira.storyIssueType),
+          quoteJqlValue('Sub-task'),
+          quoteJqlValue('Bug'),
+        ].join(', ')}) ` +
+        `AND updated >= ${quoteJqlValue(toJqlTimestamp(deltaSince))} ORDER BY updated ASC`;
 
-    let nextDeltaToken: string | undefined;
-    for (;;) {
-      const page = await client.searchIssues({
-        jql: deltaJql,
-        fields,
-        nextPageToken: nextDeltaToken,
-        maxResults: 50,
-      });
-      for (const issue of page.issues) {
+      let nextDeltaToken: string | undefined;
+      for (;;) {
+        const page = await client!.searchIssues({
+          jql: deltaJql,
+          fields,
+          nextPageToken: nextDeltaToken,
+          maxResults: 50,
+        });
+        for (const issue of page.issues) {
+          await ingestIssue({
+            db,
+            config,
+            issue,
+            client: client!,
+            mode: 'delta',
+            parentRefreshKeys,
+            linkedBugKeys,
+            changedStoryKeys: deltaChangedStoryKeys,
+          });
+          deltaProcessed += 1;
+          writeAuditBlob(config.TOONED_DATA_DIR, issue);
+        }
+        if (!page.nextPageToken) {
+          break;
+        }
+        nextDeltaToken = page.nextPageToken;
+      }
+
+      for (const parentKey of parentRefreshKeys) {
+        const parent = await client!.getIssue(parentKey, fields);
         await ingestIssue({
           db,
           config,
-          issue,
-          client,
+          issue: parent,
+          client: client!,
           mode: 'delta',
-          parentRefreshKeys,
+          parentRefreshKeys: new Set<string>(),
           linkedBugKeys,
           changedStoryKeys: deltaChangedStoryKeys,
         });
-        deltaProcessed += 1;
-        writeAuditBlob(config.TOONED_DATA_DIR, issue);
+        parentRefreshCount += 1;
+        writeAuditBlob(config.TOONED_DATA_DIR, parent);
       }
-      if (!page.nextPageToken) {
-        break;
+
+      const bugFields = [
+        'summary',
+        'status',
+        'issuetype',
+        'updated',
+        'comment',
+        'attachment',
+        'description',
+        'issuelinks',
+        'parent',
+      ];
+      for (const bugKey of linkedBugKeys) {
+        const bugIssue = await client!.getIssue(bugKey, bugFields);
+        await ingestIssue({
+          db,
+          config,
+          issue: bugIssue,
+          client: client!,
+          mode: 'delta',
+          parentRefreshKeys: new Set<string>(),
+          linkedBugKeys: new Set<string>(),
+          changedStoryKeys: deltaChangedStoryKeys,
+        });
+        linkedBugCount += 1;
+        writeAuditBlob(config.TOONED_DATA_DIR, bugIssue);
       }
-      nextDeltaToken = page.nextPageToken;
     }
 
-    for (const parentKey of parentRefreshKeys) {
-      const parent = await client.getIssue(parentKey, fields);
-      await ingestIssue({
-        db,
-        config,
-        issue: parent,
-        client,
-        mode: 'delta',
-        parentRefreshKeys: new Set<string>(),
-        linkedBugKeys,
-        changedStoryKeys: deltaChangedStoryKeys,
-      });
-      parentRefreshCount += 1;
-      writeAuditBlob(config.TOONED_DATA_DIR, parent);
+    if (syncConfluence) {
+      const confluenceBootstrapComplete = forceConfluence
+        ? false
+        : (getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false);
+      if (forceConfluence || !confluenceBootstrapComplete) {
+        await runConfluenceSync(db, config, { force: forceConfluence });
+      }
     }
 
-    const bugFields = [
-      'summary',
-      'status',
-      'issuetype',
-      'updated',
-      'comment',
-      'attachment',
-      'description',
-      'issuelinks',
-      'parent',
-    ];
-    for (const bugKey of linkedBugKeys) {
-      const bugIssue = await client.getIssue(bugKey, bugFields);
-      await ingestIssue({
-        db,
-        config,
-        issue: bugIssue,
-        client,
-        mode: 'delta',
-        parentRefreshKeys: new Set<string>(),
-        linkedBugKeys: new Set<string>(),
-        changedStoryKeys: deltaChangedStoryKeys,
-      });
-      linkedBugCount += 1;
-      writeAuditBlob(config.TOONED_DATA_DIR, bugIssue);
-    }
-
-    const confluenceBootstrapComplete = force
-      ? false
-      : (getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false);
-    if (force || !confluenceBootstrapComplete) {
-      await runConfluenceSync(db, config, { force });
-    }
-
-    const codeBootstrapComplete = force
-      ? false
-      : (getSyncStateValue<boolean>(db, CODE_BOOTSTRAP_COMPLETE_KEY) ?? false);
-    if (force || !codeBootstrapComplete) {
-      await runRepoSync(db, config, { force });
+    if (syncRepos) {
+      const codeBootstrapComplete = forceRepos
+        ? false
+        : (getSyncStateValue<boolean>(db, CODE_BOOTSTRAP_COMPLETE_KEY) ?? false);
+      if (forceRepos || !codeBootstrapComplete) {
+        await runRepoSync(db, config, { force: forceRepos });
+      }
     }
 
     const completedAt = nowIso();
-    if (config.TOONED_ENRICH_ON_SYNC === true && deltaChangedStoryKeys.size > 0) {
+    if (syncJira && config.TOONED_ENRICH_ON_SYNC === true && deltaChangedStoryKeys.size > 0) {
       queueStoryEnrichmentOnSync({
         db,
         config,
@@ -616,6 +648,7 @@ async function executeSync(config: Config, options: SyncRunOptions = {}): Promis
     } satisfies SyncStateRecord);
 
     return {
+      sources,
       mode,
       bootstrapJql,
       bootstrapProcessed,

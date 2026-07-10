@@ -175,8 +175,14 @@ export function createApp(config: Config) {
   });
 
   app.post('/sync', async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { force?: boolean };
-    const result = await runSync(config, { force: Boolean(body.force) });
+    const body = (await c.req.json().catch(() => ({}))) as {
+      force?: boolean;
+      sources?: Array<'jira' | 'confluence' | 'repos'>;
+    };
+    const result = await runSync(config, {
+      force: Boolean(body.force),
+      sources: body.sources,
+    });
     return c.json({
       ok: true,
       syncMeta: getSyncMeta(config),
