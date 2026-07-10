@@ -50,6 +50,7 @@ const mockConfig: Config = {
     },
     dodTemplates: [{ team: 'default', expectedSubtasks: ['Test'] }],
     vcs: { urlDomains: { form: [], confluence: [] } },
+    confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
     parsing: {},
   },
   fieldMap: {

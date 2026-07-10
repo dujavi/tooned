@@ -34,3 +34,14 @@ Run **one phase per agent session** for context management. Each phase plan is s
 | 1 | [prompt-run-phase-01.md](./prompt-run-phase-01.md) |
 | 2 | [prompt-run-phase-02.md](./prompt-run-phase-02.md) |
 | 2b–6 | [phase-agent-prompt-template.md](./phase-agent-prompt-template.md) |
+
+## Extension tracks (post v1)
+
+Multi-phase plans for knowledge indexing — shorter than base plans (no foundation work). Run **one phase per agent session**.
+
+| Track | Folder | Phases | Orchestration |
+|---|---|---|---|
+| Confluence + search | [confluence/](./confluence/README.md) | 3 | [knowledge-index-orchestration.md](./knowledge-index-orchestration.md) |
+| Repo crawl + code search | [repo-crawl/](./repo-crawl/README.md) | 3 | same (run after Confluence) |
+
+**Order:** Confluence track → Repo-crawl track (6 phases total).

@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/core" },
     { "path": "packages/jira" },
+    { "path": "packages/confluence" },
     { "path": "packages/bitbucket" },
     { "path": "packages/github" },
     { "path": "packages/enrich" },

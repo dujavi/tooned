@@ -37,6 +37,13 @@ export const ProjectConfigSchema = z.object({
         .default({ form: [], confluence: [] }),
     })
     .default({ urlDomains: { form: [], confluence: [] } }),
+  confluence: z
+    .object({
+      mode: z.enum(['all', 'spaces']).default('all'),
+      spaces: z.array(z.string().min(1)).default([]),
+      maxAttachmentBytes: z.number().int().positive().default(524_288),
+    })
+    .default({ mode: 'all', spaces: [], maxAttachmentBytes: 524_288 }),
   parsing: z
     .object({
       smePattern: z.string().min(1).optional(),
@@ -144,4 +151,26 @@ export function getFieldId(fields: Record<string, string>, name: string): string
     return `customfield_${value}`;
   }
   return value;
+}
+
+export function suggestConfluenceHosts(
+  configuredHosts: string[],
+  atlassianBaseUrl: string,
+): string[] {
+  if (configuredHosts.length > 0) {
+    return configuredHosts;
+  }
+  try {
+    return [new URL(atlassianBaseUrl).hostname];
+  } catch {
+    return [];
+  }
+}
+
+export function confluenceConfigWarnings(project: ProjectConfig): string[] {
+  const warnings: string[] = [];
+  if (project.confluence.mode === 'spaces' && project.confluence.spaces.length === 0) {
+    warnings.push('confluence.mode is "spaces" but confluence.spaces is empty');
+  }
+  return warnings;
 }

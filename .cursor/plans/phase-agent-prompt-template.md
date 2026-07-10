@@ -98,5 +98,13 @@ Do not start the next phase in this session.
 | 4 | 4 | phase-04-axi-cli.md | Paste 2 + 2b + 3 handoffs (brief) |
 | 5 | 5 | phase-05-tests-hooks.md | Paste Phase 4 Handoff |
 | 6 | 6 | phase-06-llm-enrichment.md | Paste Phase 5 Handoff |
+| confluence-01 | confluence-01 | confluence/phase-01-client-and-config.md | Base Tooned complete |
+| confluence-02 | confluence-02 | confluence/phase-02-sync-and-store.md | Confluence Phase 1 Handoff |
+| confluence-03 | confluence-03 | confluence/phase-03-search-and-cli.md | Confluence Phase 2 Handoff |
+| repo-01 | repo-01 | repo-crawl/phase-01-vcs-accounts.md | Confluence Phase 3 Handoff |
+| repo-02 | repo-02 | repo-crawl/phase-02-repo-index.md | Repo Phase 1 Handoff |
+| repo-03 | repo-03 | repo-crawl/phase-03-code-search-cli.md | Repo Phase 2 Handoff |
 
 Phases **2b** and **3** can run in parallel after Phase 2 (both use Phase 2 handoff).
+
+Extension tracks: see [knowledge-index-orchestration.md](./knowledge-index-orchestration.md). Use finding prefixes **PC1/PC2/PC3** and **PR1/PR2/PR3** for Confluence and repo-crawl reviews.

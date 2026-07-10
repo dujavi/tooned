@@ -28,6 +28,7 @@ const baseConfig: Config = {
     fields: {},
     dodTemplates: [],
     vcs: { bitbucket: { workspace: 'workspace' }, urlDomains: { form: [], confluence: [] } },
+    confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
     parsing: {},
   },
 };

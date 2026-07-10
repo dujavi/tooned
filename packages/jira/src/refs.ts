@@ -20,8 +20,91 @@ function hostMatches(host: string, configuredHosts: string[]): boolean {
   return configuredHosts.map(normalizeHost).includes(normalizeHost(host));
 }
 
+export type ConfluenceUrlKind = 'page' | 'tiny' | 'draft' | 'folder' | 'unknown';
+
+export interface ParsedConfluenceUrl {
+  normalizedUrl: string;
+  pageId: string | null;
+  kind: ConfluenceUrlKind;
+  tinyId?: string;
+  draftId?: string;
+  spaceKey?: string;
+}
+
+export function normalizeConfluenceUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.delete('atlOrigin');
+    const normalized = parsed.toString();
+    return normalized.endsWith('?') ? normalized.slice(0, -1) : normalized;
+  } catch {
+    return url;
+  }
+}
+
+export function parseConfluenceUrl(url: string): ParsedConfluenceUrl | null {
+  const normalizedUrl = normalizeConfluenceUrl(url);
+  let parsed: URL;
+  try {
+    parsed = new URL(normalizedUrl);
+  } catch {
+    return null;
+  }
+
+  if (!parsed.pathname.includes('/wiki/')) {
+    return null;
+  }
+
+  const folderMatch = parsed.pathname.match(/\/wiki\/spaces\/([^/]+)\/folder\/([^/]+)/i);
+  if (folderMatch) {
+    return {
+      normalizedUrl,
+      pageId: null,
+      kind: 'folder',
+      spaceKey: folderMatch[1],
+    };
+  }
+
+  const draftId = parsed.searchParams.get('draftId');
+  if (parsed.pathname.includes('/pages/resumedraft.action') && draftId) {
+    return {
+      normalizedUrl,
+      pageId: draftId,
+      kind: 'draft',
+      draftId,
+    };
+  }
+
+  const tinyMatch = parsed.pathname.match(/\/wiki\/x\/([^/]+)/i);
+  if (tinyMatch) {
+    return {
+      normalizedUrl,
+      pageId: null,
+      kind: 'tiny',
+      tinyId: tinyMatch[1],
+    };
+  }
+
+  const pageMatch = parsed.pathname.match(/\/wiki\/spaces\/([^/]+)\/pages\/(\d+)/i);
+  if (pageMatch) {
+    return {
+      normalizedUrl,
+      pageId: pageMatch[2] ?? null,
+      kind: 'page',
+      spaceKey: pageMatch[1],
+    };
+  }
+
+  return {
+    normalizedUrl,
+    pageId: null,
+    kind: 'unknown',
+  };
+}
+
 function classifyDomain(url: URL, domainConfig: DomainConfig): RefDomain {
   const host = normalizeHost(url.hostname);
+  if (url.pathname.includes('/wiki/')) return 'confluence';
   if (host.includes('atlassian.net') || host.includes('jira')) return 'jira';
   if (host.includes('bitbucket')) return 'bitbucket';
   if (host.includes('github')) return 'github';

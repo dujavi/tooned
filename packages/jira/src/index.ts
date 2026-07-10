@@ -26,7 +26,11 @@ export {
   extractTaggedRefs,
   extractUrlsFromAdf,
   extractUrlsFromMarkdown,
+  normalizeConfluenceUrl,
+  parseConfluenceUrl,
   type ExtractedRef,
   type RefDomain,
   type DomainConfig,
+  type ConfluenceUrlKind,
+  type ParsedConfluenceUrl,
 } from './refs.js';

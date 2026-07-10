@@ -4,6 +4,7 @@ import {
   ProjectConfigError,
   type DodTemplate,
   type ProjectConfig,
+  suggestConfluenceHosts,
 } from './project-config.js';
 
 const optionalString = z.preprocess(
@@ -79,14 +80,29 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const bitbucketWorkspace =
     parsedEnv.BITBUCKET_WORKSPACE ?? project.vcs.bitbucket?.workspace;
 
+  const confluenceHosts = suggestConfluenceHosts(
+    project.vcs.urlDomains.confluence,
+    parsedEnv.ATLASSIAN_BASE_URL,
+  );
+  const projectWithDefaults: ProjectConfig = {
+    ...project,
+    vcs: {
+      ...project.vcs,
+      urlDomains: {
+        ...project.vcs.urlDomains,
+        confluence: confluenceHosts,
+      },
+    },
+  };
+
   return {
     ...parsedEnv,
-    project,
+    project: projectWithDefaults,
     ATLASSIAN_BOARD_ID: boardId,
     JIRA_PROJECT_KEY: projectKey,
     BITBUCKET_WORKSPACE: bitbucketWorkspace,
-    fieldMap: project.fields,
-    dodTemplates: project.dodTemplates,
+    fieldMap: projectWithDefaults.fields,
+    dodTemplates: projectWithDefaults.dodTemplates,
   };
 }
 

@@ -28,6 +28,7 @@ const baseConfig: Config = {
     fields: {},
     dodTemplates: [],
     vcs: { urlDomains: { form: [], confluence: [] } },
+    confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
     parsing: {},
   },
 };

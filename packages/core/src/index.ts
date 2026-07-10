@@ -16,6 +16,8 @@ export {
   jqlMatchesExpected,
   getFieldId,
   resolveConfigPath,
+  suggestConfluenceHosts,
+  confluenceConfigWarnings,
   type ProjectConfig,
   type DodTemplate,
 } from './project-config.js';

@@ -3,12 +3,14 @@ import { createServer } from 'node:net';
 import { resolve } from 'node:path';
 import {
   jqlMatchesExpected,
+  confluenceConfigWarnings,
   type Config,
 } from '@tooned/core';
 import {
   createJiraClient,
   JiraError,
 } from '@tooned/jira';
+import { confluenceWikiBaseUrl } from '@tooned/confluence';
 import { closeDb, ensureDataDir, getDb, setSyncStateValue } from '@tooned/sync';
 import { fetchHealth } from '../client.js';
 import {
@@ -37,6 +39,26 @@ function checkEnv(config: Config): DoctorCheck {
     name: 'env',
     status: 'pass',
     message: 'Required Atlassian variables present',
+  };
+}
+
+function checkConfluence(config: Config): DoctorCheck {
+  const warnings = confluenceConfigWarnings(config.project);
+  const wikiBase = confluenceWikiBaseUrl(config);
+  const hosts = config.project.vcs.urlDomains.confluence;
+
+  if (warnings.length > 0) {
+    return {
+      name: 'confluence',
+      status: 'warn',
+      message: `${warnings[0]} (wiki base: ${wikiBase}, hosts: ${hosts.join(', ') || 'none'})`,
+    };
+  }
+
+  return {
+    name: 'confluence',
+    status: 'pass',
+    message: `Confluence configured (wiki base: ${wikiBase}, hosts: ${hosts.join(', ')})`,
   };
 }
 
@@ -197,6 +219,7 @@ export async function runDoctor(verbose: boolean): Promise<number> {
   const checks: DoctorCheck[] = [
     checkEnv(config),
     await checkJira(config),
+    checkConfluence(config),
     checkDataDir(config.TOONED_DATA_DIR),
     await checkPort(config),
     checkBitbucket(config),
