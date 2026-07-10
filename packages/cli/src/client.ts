@@ -169,18 +169,66 @@ export interface StorySummaryResponse {
 
 export interface SearchResponse {
   syncMeta: SyncMeta;
+  pageCount?: number;
+  confluenceBootstrapComplete?: boolean;
+  confluenceLastSync?: string | null;
   query: string;
-  scope: 'all' | 'comments' | 'notes';
+  scope: 'all' | 'stories' | 'docs' | 'code' | 'comments' | 'notes';
   count: number;
   results: Array<{
-    key: string;
-    summary: string | null;
-    status: string | null;
-    sourceUpdatedAt: string | null;
-    comments: number;
-    subtasks: number;
-    prs: number;
+    source?: 'story' | 'doc' | 'code';
+    key?: string;
+    pageId?: string;
+    title?: string;
+    summary?: string | null;
+    status?: string | null;
+    spaceKey?: string | null;
+    url?: string | null;
+    sourceUpdatedAt?: string | null;
+    excerpt?: string | null;
+    comments?: number;
+    subtasks?: number;
+    prs?: number;
   }>;
+  codeSearchStatus?: 'not_configured';
+  help?: string[];
+}
+
+export interface PagesListResponse {
+  syncMeta: SyncMeta;
+  pageCount: number;
+  confluenceBootstrapComplete: boolean;
+  confluenceLastSync: string | null;
+  count: number;
+  pages: Array<{
+    pageId: string;
+    title: string | null;
+    spaceKey: string | null;
+    url: string | null;
+    sourceUpdatedAt: string | null;
+  }>;
+}
+
+export interface PageDetailResponse {
+  syncMeta: SyncMeta;
+  pageCount: number;
+  confluenceBootstrapComplete: boolean;
+  confluenceLastSync: string | null;
+  page: {
+    pageId: string;
+    title: string | null;
+    spaceKey: string | null;
+    url: string | null;
+    labels: string[];
+    ancestorTitles: string | null;
+    version: number | null;
+    sourceUpdatedAt: string | null;
+    syncedAt: string | null;
+    excerpt: string;
+    bodyMd: string | null;
+    bodySize: number;
+    refs: Array<{ id: string; issueKey: string | null; url: string | null; domain: string | null }>;
+  };
 }
 
 export interface RefSearchResponse {
@@ -377,7 +425,14 @@ export async function fetchStorySummary(
 
 export async function fetchSearch(
   config: Config,
-  options: { query: string; inScope?: 'all' | 'comments' | 'notes'; sprint?: string; status?: string; since?: string },
+  options: {
+    query: string;
+    inScope?: 'all' | 'stories' | 'docs' | 'code' | 'comments' | 'notes';
+    sprint?: string;
+    status?: string;
+    since?: string;
+    limit?: number;
+  },
 ): Promise<SearchResponse> {
   return fetchJson<SearchResponse>(
     config,
@@ -387,9 +442,30 @@ export async function fetchSearch(
       sprint: options.sprint,
       status: options.status,
       since: options.since,
+      limit: options.limit,
     }),
     { signal: AbortSignal.timeout(5000) },
   );
+}
+
+export async function fetchPages(
+  config: Config,
+  options: { space?: string; limit?: number },
+): Promise<PagesListResponse> {
+  return fetchJson<PagesListResponse>(
+    config,
+    withQuery('/pages', {
+      space: options.space,
+      limit: options.limit,
+    }),
+    { signal: AbortSignal.timeout(5000) },
+  );
+}
+
+export async function fetchPage(config: Config, pageId: string): Promise<PageDetailResponse> {
+  return fetchJson<PageDetailResponse>(config, `/pages/${encodeURIComponent(pageId)}`, {
+    signal: AbortSignal.timeout(5000),
+  });
 }
 
 export async function fetchRefsSearch(config: Config, query: string): Promise<RefSearchResponse> {

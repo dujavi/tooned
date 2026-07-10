@@ -5,6 +5,7 @@
     "rootDir": "src"
   },
   "references": [
+    { "path": "../confluence" },
     { "path": "../core" },
     { "path": "../confluence" },
     { "path": "../jira" },

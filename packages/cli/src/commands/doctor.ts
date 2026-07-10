@@ -10,8 +10,17 @@ import {
   createJiraClient,
   JiraError,
 } from '@tooned/jira';
-import { confluenceWikiBaseUrl } from '@tooned/confluence';
-import { closeDb, ensureDataDir, getDb, setSyncStateValue } from '@tooned/sync';
+import { confluenceWikiBaseUrl, buildCrawlCql, createConfluenceClient } from '@tooned/confluence';
+import {
+  closeDb,
+  ensureDataDir,
+  getConfluencePageCount,
+  getDb,
+  getSyncStateValue,
+  setSyncStateValue,
+  CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,
+  CONFLUENCE_LAST_SYNC_KEY,
+} from '@tooned/sync';
 import { fetchHealth } from '../client.js';
 import {
   computeOverall,
@@ -45,20 +54,23 @@ function checkEnv(config: Config): DoctorCheck {
 function checkConfluence(config: Config): DoctorCheck {
   const warnings = confluenceConfigWarnings(config.project);
   const wikiBase = confluenceWikiBaseUrl(config);
-  const hosts = config.project.vcs.urlDomains.confluence;
+  const db = getDb(config.TOONED_DATA_DIR);
+  const pageCount = getConfluencePageCount(db);
+  const bootstrapComplete =
+    getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false;
 
   if (warnings.length > 0) {
     return {
       name: 'confluence',
       status: 'warn',
-      message: `${warnings[0]} (wiki base: ${wikiBase}, hosts: ${hosts.join(', ') || 'none'})`,
+      message: `${warnings[0]} (wiki base: ${wikiBase}, pages: ${pageCount}, bootstrapComplete: ${bootstrapComplete})`,
     };
   }
 
   return {
     name: 'confluence',
     status: 'pass',
-    message: `Confluence configured (wiki base: ${wikiBase}, hosts: ${hosts.join(', ')})`,
+    message: `Confluence configured (wiki base: ${wikiBase}, pages: ${pageCount}, bootstrapComplete: ${bootstrapComplete})`,
   };
 }
 
@@ -210,6 +222,34 @@ async function runBoardVerification(
   };
 }
 
+async function runConfluenceVerification(
+  config: Config,
+): Promise<Record<string, string | number | boolean | null>> {
+  const db = getDb(config.TOONED_DATA_DIR);
+  const cql = buildCrawlCql(config.project.confluence.mode, config.project.confluence.spaces);
+  let apiReachable = false;
+  let cqlSampleCount = 0;
+
+  try {
+    const client = createConfluenceClient(config);
+    const page = await client.searchCql(cql);
+    apiReachable = true;
+    cqlSampleCount = page.results.length;
+  } catch {
+    apiReachable = false;
+  }
+
+  return {
+    confluenceBootstrapComplete:
+      getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false,
+    confluenceLastSync: getSyncStateValue<string>(db, CONFLUENCE_LAST_SYNC_KEY) ?? null,
+    confluencePageCount: getConfluencePageCount(db),
+    confluenceCql: cql,
+    confluenceApiReachable: apiReachable,
+    confluenceCqlSampleCount: cqlSampleCount,
+  };
+}
+
 export async function runDoctor(verbose: boolean): Promise<number> {
   const config = loadConfigOrEmitError();
   if (!config) {
@@ -236,7 +276,9 @@ export async function runDoctor(verbose: boolean): Promise<number> {
 
   if (verbose && result.overall !== 'fail') {
     try {
-      result.verbose = await runBoardVerification(config);
+      const board = await runBoardVerification(config);
+      const confluence = await runConfluenceVerification(config);
+      result.verbose = { ...board, ...confluence };
     } catch (error) {
       const message = error instanceof JiraError ? error.message : 'Board verification failed';
       checks.push({

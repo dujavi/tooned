@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@tooned/confluence": "workspace:*",
+    "@tooned/confluence": "workspace:*",
     "@tooned/core": "workspace:*",
     "@tooned/jira": "workspace:*",
     "@tooned/service": "workspace:*",

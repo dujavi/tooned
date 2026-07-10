@@ -4,6 +4,11 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "references": [{ "path": "../core" }, { "path": "../enrich" }, { "path": "../sync" }],
+  "references": [
+    { "path": "../core" },
+    { "path": "../enrich" },
+    { "path": "../jira" },
+    { "path": "../sync" }
+  ],
   "include": ["src/**/*"]
 }

@@ -799,4 +799,105 @@ export function retagWikiExtractedRefs(db: Db): number {
   return Number(result.changes);
 }
 
+export interface PageSearchResultRow {
+  pageId: string;
+  title: string | null;
+  spaceKey: string | null;
+  url: string | null;
+  sourceUpdatedAt: string | null;
+  excerpt: string | null;
+}
+
+export type GlobalSearchSource = 'story' | 'doc' | 'code';
+
+export interface GlobalSearchHit {
+  source: GlobalSearchSource;
+  key?: string;
+  pageId?: string;
+  title: string;
+  summary?: string | null;
+  status?: string | null;
+  spaceKey?: string | null;
+  url?: string | null;
+  sourceUpdatedAt?: string | null;
+  comments?: number;
+  subtasks?: number;
+  prs?: number;
+}
+
+export interface GlobalSearchResult {
+  results: GlobalSearchHit[];
+  codeSearchStatus?: 'not_configured';
+  help?: string[];
+}
+
+export function searchPages(db: Db, query: string, limit: number): PageSearchResultRow[] {
+  const rows = db
+    .prepare(
+      `SELECT
+         p.page_id AS pageId,
+         p.title,
+         p.space_key AS spaceKey,
+         p.url,
+         p.source_updated_at AS sourceUpdatedAt,
+         substr(p.body_md, 1, 200) AS excerpt
+       FROM confluence_search f
+       JOIN confluence_pages p ON p.page_id = f.page_id
+       WHERE confluence_search MATCH ?
+       ORDER BY bm25(confluence_search)
+       LIMIT ?`,
+    )
+    .all(query, limit) as unknown as PageSearchResultRow[];
+
+  return rows;
+}
+
+export function searchGlobal(
+  db: Db,
+  query: string,
+  limit: number,
+  options?: { status?: string; sprint?: string; since?: string },
+): GlobalSearchResult {
+  const storyHits = searchStories(db, query, limit, options).map(
+    (row): GlobalSearchHit => ({
+      source: 'story',
+      key: row.key,
+      title: row.summary ?? row.key,
+      summary: row.summary,
+      status: row.status,
+      sourceUpdatedAt: row.sourceUpdatedAt,
+      comments: row.comments,
+      subtasks: row.subtasks,
+      prs: row.prs,
+    }),
+  );
+  const docHits = searchPages(db, query, limit).map(
+    (row): GlobalSearchHit => ({
+      source: 'doc',
+      pageId: row.pageId,
+      title: row.title ?? row.pageId,
+      spaceKey: row.spaceKey,
+      url: row.url,
+      sourceUpdatedAt: row.sourceUpdatedAt,
+      summary: row.excerpt,
+    }),
+  );
+
+  return {
+    results: [...storyHits, ...docHits],
+  };
+}
+
+export function searchCodeStub(): GlobalSearchResult {
+  return {
+    results: [],
+    codeSearchStatus: 'not_configured',
+    help: [
+      'Code search is not configured yet',
+      'Complete the repo-crawl track to index repositories',
+      'Run `tooned search "<query>" --in all` for stories and docs meanwhile',
+    ],
+  };
+}
+
 export type { Db };

@@ -20,6 +20,14 @@ import {
   runSync,
   searchRefs,
   searchStories,
+  searchPages,
+  searchGlobal,
+  searchCodeStub,
+  getPageById,
+  listPages,
+  getConfluencePageCount,
+  CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,
+  CONFLUENCE_LAST_SYNC_KEY,
   SUPPORTED_ENRICHMENT_TYPES,
   type SprintStory,
   type EnrichmentType,
@@ -35,6 +43,32 @@ function getSyncMeta(config: Config) {
   const db = getDb(config.TOONED_DATA_DIR);
   const syncState = getSyncStateValue<SyncStateRecord>(db, 'sync') ?? {};
   return buildSyncMeta(syncState.lastSync ?? null, syncState.syncStatus ?? 'idle');
+}
+
+function getIndexMeta(config: Config) {
+  const db = getDb(config.TOONED_DATA_DIR);
+  return {
+    syncMeta: getSyncMeta(config),
+    pageCount: getConfluencePageCount(db),
+    confluenceBootstrapComplete:
+      getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false,
+    confluenceLastSync: getSyncStateValue<string>(db, CONFLUENCE_LAST_SYNC_KEY) ?? null,
+  };
+}
+
+type SearchScope = 'all' | 'stories' | 'docs' | 'code' | 'comments' | 'notes';
+
+function parseSearchScope(raw: string | undefined): SearchScope {
+  if (
+    raw === 'stories' ||
+    raw === 'docs' ||
+    raw === 'code' ||
+    raw === 'comments' ||
+    raw === 'notes'
+  ) {
+    return raw;
+  }
+  return 'all';
 }
 
 function parseLimit(raw: string | undefined, defaultValue: number, maxValue: number): number {
@@ -84,9 +118,9 @@ function mapSprintStory(story: SprintStory) {
   };
 }
 
-function parseSearchScope(raw: string | undefined): 'all' | 'comments' | 'notes' {
-  if (raw === 'comments' || raw === 'notes') {
-    return raw;
+function parseStorySearchScope(scope: SearchScope): 'all' | 'comments' | 'notes' {
+  if (scope === 'comments' || scope === 'notes') {
+    return scope;
   }
   return 'all';
 }
@@ -231,7 +265,7 @@ export function createApp(config: Config) {
       return c.json(
         {
           error: 'q query parameter is required',
-          syncMeta: getSyncMeta(config),
+          ...getIndexMeta(config),
         },
         400,
       );
@@ -242,23 +276,170 @@ export function createApp(config: Config) {
     const status = c.req.query('status') || undefined;
     const sprint = c.req.query('sprint') || undefined;
     const since = c.req.query('since') || undefined;
-    const results = searchStories(
-      db,
-      buildSearchExpression(query, scope),
-      limit,
-      {
-        in: scope,
-        status,
-        sprint,
-        since,
-      },
-    );
+    const meta = getIndexMeta(config);
+
+    if (scope === 'code') {
+      const codeResult = searchCodeStub();
+      return c.json({
+        ...meta,
+        query,
+        scope,
+        count: 0,
+        results: codeResult.results,
+        codeSearchStatus: codeResult.codeSearchStatus,
+        help: codeResult.help,
+      });
+    }
+
+    if (scope === 'docs') {
+      const results = searchPages(db, query, limit);
+      return c.json({
+        ...meta,
+        query,
+        scope,
+        count: results.length,
+        results: results.map((row) => ({
+          source: 'doc',
+          pageId: row.pageId,
+          title: row.title,
+          spaceKey: row.spaceKey,
+          url: row.url,
+          sourceUpdatedAt: row.sourceUpdatedAt,
+          excerpt: row.excerpt,
+        })),
+      });
+    }
+
+    if (scope === 'all') {
+      const globalResult = searchGlobal(db, query, limit, { status, sprint, since });
+      return c.json({
+        ...meta,
+        query,
+        scope,
+        count: globalResult.results.length,
+        results: globalResult.results,
+      });
+    }
+
+    const storyScope = parseStorySearchScope(scope);
+    const storyResults =
+      scope === 'stories'
+        ? searchStories(db, query, limit, { status, sprint, since })
+        : searchStories(db, buildSearchExpression(query, storyScope), limit, {
+            in: storyScope,
+            status,
+            sprint,
+            since,
+          });
+
     return c.json({
-      syncMeta: getSyncMeta(config),
+      ...meta,
       query,
       scope,
+      count: storyResults.length,
+      results: storyResults.map((row) => ({
+        source: 'story',
+        key: row.key,
+        title: row.summary ?? row.key,
+        summary: row.summary,
+        status: row.status,
+        sourceUpdatedAt: row.sourceUpdatedAt,
+        comments: row.comments,
+        subtasks: row.subtasks,
+        prs: row.prs,
+      })),
+    });
+  });
+
+  app.get('/pages/search', (c) => {
+    const db = getDb(config.TOONED_DATA_DIR);
+    const query = (c.req.query('q') ?? '').trim();
+    if (!query) {
+      return c.json(
+        {
+          error: 'q query parameter is required',
+          ...getIndexMeta(config),
+        },
+        400,
+      );
+    }
+
+    const limit = parseLimit(c.req.query('limit'), 20, 100);
+    const results = searchPages(db, query, limit);
+    return c.json({
+      ...getIndexMeta(config),
+      query,
       count: results.length,
       results,
+    });
+  });
+
+  app.get('/pages/:id', (c) => {
+    const db = getDb(config.TOONED_DATA_DIR);
+    const page = getPageById(db, c.req.param('id'));
+    if (!page) {
+      return c.json(
+        {
+          error: `Page not found: ${c.req.param('id')}`,
+          ...getIndexMeta(config),
+        },
+        404,
+      );
+    }
+
+    let labels: string[] = [];
+    if (page.labelsJson) {
+      try {
+        const parsed = JSON.parse(page.labelsJson) as unknown;
+        if (Array.isArray(parsed)) {
+          labels = parsed.filter((item): item is string => typeof item === 'string');
+        }
+      } catch {
+        labels = [];
+      }
+    }
+
+    const refs = db
+      .prepare(
+        'SELECT id, issue_key AS issueKey, url, domain FROM page_refs WHERE page_id = ? ORDER BY id ASC',
+      )
+      .all(page.pageId) as Array<{ id: string; issueKey: string | null; url: string | null; domain: string | null }>;
+
+    return c.json({
+      ...getIndexMeta(config),
+      page: {
+        pageId: page.pageId,
+        title: page.title,
+        spaceKey: page.spaceKey,
+        url: page.url,
+        labels,
+        ancestorTitles: page.ancestorTitles,
+        version: page.version,
+        sourceUpdatedAt: page.sourceUpdatedAt,
+        syncedAt: page.syncedAt,
+        excerpt: (page.bodyMd ?? '').slice(0, 500),
+        bodyMd: page.bodyMd,
+        bodySize: (page.bodyMd ?? '').length,
+        refs,
+      },
+    });
+  });
+
+  app.get('/pages', (c) => {
+    const db = getDb(config.TOONED_DATA_DIR);
+    const limit = parseLimit(c.req.query('limit'), 20, 100);
+    const space = c.req.query('space') || undefined;
+    const pages = listPages(db, { space, limit });
+    return c.json({
+      ...getIndexMeta(config),
+      count: pages.length,
+      pages: pages.map((page) => ({
+        pageId: page.pageId,
+        title: page.title,
+        spaceKey: page.spaceKey,
+        url: page.url,
+        sourceUpdatedAt: page.sourceUpdatedAt,
+      })),
     });
   });
 

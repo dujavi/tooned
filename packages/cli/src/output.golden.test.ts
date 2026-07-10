@@ -32,6 +32,9 @@ describe('TOON golden snapshots', () => {
       bin: '~/.local/bin/tooned',
       serviceRunning: true,
       storyCount: 12,
+      pageCount: 0,
+      confluenceBootstrapComplete: false,
+      confluenceLastSync: null,
       openStoryCount: 7,
       currentSprint: null,
     });

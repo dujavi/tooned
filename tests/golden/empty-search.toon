@@ -2,5 +2,5 @@ syncMeta:
   lastSync: "2026-07-09T20:00:00.000Z"
   dataAgeSeconds: 60
   syncStatus: idle
-search: "0 stories found for \"modal\""
-help[1]: "Run `tooned search \"<query>\" --in all` to broaden scope"
+search: "0 results found for \"modal\""
+help[2]: "Run `tooned search \"<query>\" --in stories` for Jira stories only","Run `tooned search \"<query>\" --in docs` for Confluence pages"

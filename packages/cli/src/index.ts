@@ -3,7 +3,7 @@ import { config as loadDotenv } from 'dotenv';
 import { Command } from 'commander';
 import { runDoctor } from './commands/doctor.js';
 import { runRefsSearch } from './commands/refs.js';
-import { runSearch } from './commands/search.js';
+import { runSearch, type SearchScope } from './commands/search.js';
 import { runServe } from './commands/serve.js';
 import { runSetupHooks } from './commands/setup.js';
 import { runSprintCurrent, runSprintNext } from './commands/sprint.js';
@@ -19,8 +19,17 @@ import {
   runStoriesView,
 } from './commands/stories.js';
 import { runSyncCommand } from './commands/sync.js';
+import { runPagesList, runPagesView } from './commands/pages.js';
 import { collapseHomePath, formatUnknownFlagToon, formatToon } from './output.js';
-import { closeDb, getDb, getStoryCount, getSyncStateValue } from '@tooned/sync';
+import {
+  closeDb,
+  getDb,
+  getConfluencePageCount,
+  getStoryCount,
+  getSyncStateValue,
+  CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,
+  CONFLUENCE_LAST_SYNC_KEY,
+} from '@tooned/sync';
 import { buildSyncMeta } from '@tooned/core';
 import { fetchHealth } from './client.js';
 import { loadConfigOrEmitError } from './commands/shared.js';
@@ -62,7 +71,9 @@ const FLAG_RULES: FlagValidationRule[] = [
   { command: 'stories history', path: ['stories', 'history'], flags: ['--since'] },
   { command: 'stories sizing', path: ['stories', 'sizing'], flags: [] },
   { command: 'stories summarize', path: ['stories', 'summarize'], flags: ['--comments', '--since', '--force'] },
-  { command: 'search', path: ['search'], flags: ['--in', '--sprint', '--status', '--since'] },
+  { command: 'search', path: ['search'], flags: ['--in', '--sprint', '--status', '--since', '--limit'] },
+  { command: 'pages list', path: ['pages', 'list'], flags: ['--space', '--limit'] },
+  { command: 'pages view', path: ['pages', 'view'], flags: ['--full'] },
   { command: 'refs search', path: ['refs', 'search'], flags: [] },
 ];
 
@@ -156,6 +167,10 @@ program.action(async () => {
           bin: binPath,
           serviceRunning,
           storyCount: getStoryCount(db),
+          pageCount: getConfluencePageCount(db),
+          confluenceBootstrapComplete:
+            getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false,
+          confluenceLastSync: getSyncStateValue<string>(db, CONFLUENCE_LAST_SYNC_KEY) ?? null,
           openStoryCount,
           currentSprint,
         }),
@@ -339,21 +354,61 @@ stories
 
 program
   .command('search')
-  .description('Search stories and notes')
+  .description('Search stories, docs, and notes')
   .argument('<query>', 'Search query')
-  .option('--in <scope>', 'all|comments|notes', 'all')
+  .option('--in <scope>', 'all|stories|docs|code|comments|notes', 'all')
   .option('--sprint <name>', 'Filter by sprint')
   .option('--status <status>', 'Filter by status')
   .option('--since <isoDate>', 'Filter by updated timestamp')
-  .addHelpText('after', '\nExamples:\n  tooned search modal\n  tooned search "evaluate dod" --in comments')
-  .action(async (query: string, options: { in: 'all' | 'comments' | 'notes'; sprint?: string; status?: string; since?: string }) => {
-    const scope = options.in === 'comments' || options.in === 'notes' ? options.in : 'all';
-    const exitCode = await runSearch(query, {
-      inScope: scope,
-      sprint: options.sprint,
-      status: options.status,
-      since: options.since,
-    });
+  .option('--limit <n>', 'Limit rows', (value) => Number.parseInt(value, 10), 20)
+  .addHelpText(
+    'after',
+    '\nExamples:\n  tooned search workflow --in docs\n  tooned search workflow --in all\n  tooned search "evaluate dod" --in comments',
+  )
+  .action(
+    async (
+      query: string,
+      options: {
+        in: SearchScope;
+        sprint?: string;
+        status?: string;
+        since?: string;
+        limit?: number;
+      },
+    ) => {
+      const allowed: SearchScope[] = ['all', 'stories', 'docs', 'code', 'comments', 'notes'];
+      const scope = allowed.includes(options.in) ? options.in : 'all';
+      const exitCode = await runSearch(query, {
+        inScope: scope,
+        sprint: options.sprint,
+        status: options.status,
+        since: options.since,
+        limit: options.limit,
+      });
+      process.exit(exitCode);
+    },
+  );
+
+const pages = program.command('pages').description('Confluence page commands');
+pages
+  .command('list')
+  .description('List synced Confluence pages')
+  .option('--space <key>', 'Filter by space key')
+  .option('--limit <n>', 'Limit rows', (value) => Number.parseInt(value, 10), 20)
+  .addHelpText('after', '\nExamples:\n  tooned pages list --space CRM --limit 5')
+  .action(async (options: { space?: string; limit?: number }) => {
+    const exitCode = await runPagesList(options);
+    process.exit(exitCode);
+  });
+
+pages
+  .command('view')
+  .description('View a Confluence page by ID or wiki URL')
+  .argument('<pageIdOrUrl>', 'Page ID or /wiki/ URL')
+  .option('--full', 'Show full page body')
+  .addHelpText('after', '\nExamples:\n  tooned pages view 1007157249\n  tooned pages view 1007157249 --full')
+  .action(async (pageIdOrUrl: string, options: { full?: boolean }) => {
+    const exitCode = await runPagesView(pageIdOrUrl, { full: Boolean(options.full) });
     process.exit(exitCode);
   });
 

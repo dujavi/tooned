@@ -84,9 +84,31 @@ export function formatUnknownFlagToon(input: {
   );
 }
 
-export function formatEmptySearchToon(syncMeta: SyncMeta, query: string): string {
+export function formatEmptySearchToon(
+  syncMeta: SyncMeta,
+  query: string,
+  scope: 'all' | 'stories' | 'docs' | 'code' | 'comments' | 'notes' = 'all',
+): string {
+  const scopeLabel =
+    scope === 'docs'
+      ? 'docs'
+      : scope === 'code'
+        ? 'code'
+        : scope === 'comments'
+          ? 'comments'
+          : scope === 'notes'
+            ? 'notes'
+            : scope === 'stories'
+              ? 'stories'
+              : 'results';
   return formatToon(syncMeta, {
-    search: `0 stories found for "${query}"`,
-    help: ['Run `tooned search "<query>" --in all` to broaden scope'],
+    search: `0 ${scopeLabel} found for "${query}"`,
+    help:
+      scope === 'all'
+        ? [
+            'Run `tooned search "<query>" --in stories` for Jira stories only',
+            'Run `tooned search "<query>" --in docs` for Confluence pages',
+          ]
+        : ['Try `tooned search "<query>" --in all` to search stories and docs together'],
   });
 }
