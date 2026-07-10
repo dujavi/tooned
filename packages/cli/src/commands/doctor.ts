@@ -20,11 +20,13 @@ import {
   closeDb,
   ensureDataDir,
   getConfluencePageCount,
+  getCodeFileCount,
   getDb,
   getSyncStateValue,
   setSyncStateValue,
   CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,
   CONFLUENCE_LAST_SYNC_KEY,
+  CODE_BOOTSTRAP_COMPLETE_KEY,
 } from '@tooned/sync';
 import { fetchHealth } from '../client.js';
 import {
@@ -82,6 +84,17 @@ function checkConfluence(config: Config): DoctorCheck {
 async function checkVcs(config: Config): Promise<DoctorCheck> {
   const accounts = getResolvedVcsAccounts(config);
   const repoSummary = summarizeVcsRepoTargets(config.project.vcs.repos);
+  const db = getDb(config.TOONED_DATA_DIR);
+  const codeFileCount =
+    config.project.vcs.repos.length > 0 ? getCodeFileCount(db) : 0;
+  const codeBootstrapComplete =
+    config.project.vcs.repos.length > 0
+      ? (getSyncStateValue<boolean>(db, CODE_BOOTSTRAP_COMPLETE_KEY) ?? false)
+      : false;
+  const codeSummary =
+    config.project.vcs.repos.length > 0
+      ? `indexedFiles: ${codeFileCount}, bootstrapComplete: ${codeBootstrapComplete}`
+      : 'no repo crawl targets configured';
 
   if (accounts.length === 0) {
     return {
@@ -150,7 +163,7 @@ async function checkVcs(config: Config): Promise<DoctorCheck> {
   return {
     name: 'vcs',
     status,
-    message: `${accountStatuses.join('; ')} | repos: ${repoSummary}`,
+    message: `${accountStatuses.join('; ')} | repos: ${repoSummary} | code: ${codeSummary}`,
   };
 }
 

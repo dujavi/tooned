@@ -3,7 +3,7 @@ syncMeta:
   dataAgeSeconds: 60
   syncStatus: idle
 bin: ~/.local/bin/tooned
-description: "Inspect synced Jira stories, Confluence docs, and sprint delivery state"
+description: "Inspect synced Jira stories, Confluence docs, indexed code, and sprint delivery state"
 serviceRunning: true
 storyCount: 12
 pageCount: 0
@@ -11,4 +11,4 @@ confluenceBootstrapComplete: false
 confluenceLastSync: null
 openStoryCount: 7
 currentSprint: null
-help[3]: Run `tooned sprint current --workload` to inspect current sprint,"Run `tooned search \"<query>\" --in all` to search stories and docs",Run `tooned pages list --space CRM --limit 20` to browse Confluence pages
+help[4]: Run `tooned sprint current --workload` to inspect current sprint,"Run `tooned search \"<query>\" --in all` to search stories, docs, and code",Run `tooned pages list --space CRM --limit 20` to browse Confluence pages,Run `tooned repos list` to browse indexed repositories

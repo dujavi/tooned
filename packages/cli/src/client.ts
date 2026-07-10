@@ -185,13 +185,46 @@ export interface SearchResponse {
     spaceKey?: string | null;
     url?: string | null;
     sourceUpdatedAt?: string | null;
+    repository?: string;
+    path?: string;
     excerpt?: string | null;
     comments?: number;
     subtasks?: number;
     prs?: number;
   }>;
-  codeSearchStatus?: 'not_configured';
+  codeSearchStatus?: 'not_configured' | 'empty';
   help?: string[];
+}
+
+export interface ReposListResponse {
+  syncMeta: SyncMeta;
+  codeFileCount?: number;
+  codeBootstrapComplete?: boolean;
+  codeLastSync?: string | null;
+  count: number;
+  repos: Array<{
+    accountId: string;
+    provider: string;
+    repository: string;
+    ref: string;
+    fileCount: number;
+  }>;
+}
+
+export interface CodeViewResponse {
+  syncMeta: SyncMeta;
+  file: {
+    fileId: string;
+    accountId: string;
+    provider: string;
+    repository: string;
+    path: string;
+    ref: string;
+    language: string | null;
+    sizeBytes: number | null;
+    excerpt: string;
+    content: string | null;
+  };
 }
 
 export interface PagesListResponse {
@@ -466,6 +499,28 @@ export async function fetchPage(config: Config, pageId: string): Promise<PageDet
   return fetchJson<PageDetailResponse>(config, `/pages/${encodeURIComponent(pageId)}`, {
     signal: AbortSignal.timeout(5000),
   });
+}
+
+export async function fetchRepos(config: Config): Promise<ReposListResponse> {
+  return fetchJson<ReposListResponse>(config, '/repos', {
+    signal: AbortSignal.timeout(5000),
+  });
+}
+
+export async function fetchCodeFile(
+  config: Config,
+  options: { fileId?: string; accountId?: string; repository?: string; path?: string },
+): Promise<CodeViewResponse> {
+  return fetchJson<CodeViewResponse>(
+    config,
+    withQuery('/code', {
+      fileId: options.fileId,
+      accountId: options.accountId,
+      repository: options.repository,
+      path: options.path,
+    }),
+    { signal: AbortSignal.timeout(5000) },
+  );
 }
 
 export async function fetchRefsSearch(config: Config, query: string): Promise<RefSearchResponse> {

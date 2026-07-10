@@ -22,12 +22,18 @@ import {
   searchStories,
   searchPages,
   searchGlobal,
-  searchCodeStub,
+  searchCodeQuery,
   getPageById,
   listPages,
   getConfluencePageCount,
+  getCodeFileCount,
+  getCodeFile,
+  listReposIndexed,
+  buildCodeFileId,
   CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,
   CONFLUENCE_LAST_SYNC_KEY,
+  CODE_BOOTSTRAP_COMPLETE_KEY,
+  CODE_LAST_SYNC_KEY,
   SUPPORTED_ENRICHMENT_TYPES,
   type SprintStory,
   type EnrichmentType,
@@ -47,12 +53,21 @@ function getSyncMeta(config: Config) {
 
 function getIndexMeta(config: Config) {
   const db = getDb(config.TOONED_DATA_DIR);
+  const codeReposConfigured = config.project.vcs.repos.length > 0;
   return {
     syncMeta: getSyncMeta(config),
     pageCount: getConfluencePageCount(db),
     confluenceBootstrapComplete:
       getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false,
     confluenceLastSync: getSyncStateValue<string>(db, CONFLUENCE_LAST_SYNC_KEY) ?? null,
+    ...(codeReposConfigured
+      ? {
+          codeFileCount: getCodeFileCount(db),
+          codeBootstrapComplete:
+            getSyncStateValue<boolean>(db, CODE_BOOTSTRAP_COMPLETE_KEY) ?? false,
+          codeLastSync: getSyncStateValue<string>(db, CODE_LAST_SYNC_KEY) ?? null,
+        }
+      : {}),
   };
 }
 
@@ -279,12 +294,17 @@ export function createApp(config: Config) {
     const meta = getIndexMeta(config);
 
     if (scope === 'code') {
-      const codeResult = searchCodeStub();
+      const codeResult = searchCodeQuery(
+        db,
+        query,
+        limit,
+        config.project.vcs.repos.length > 0,
+      );
       return c.json({
         ...meta,
         query,
         scope,
-        count: 0,
+        count: codeResult.results.length,
         results: codeResult.results,
         codeSearchStatus: codeResult.codeSearchStatus,
         help: codeResult.help,
@@ -311,13 +331,20 @@ export function createApp(config: Config) {
     }
 
     if (scope === 'all') {
-      const globalResult = searchGlobal(db, query, limit, { status, sprint, since });
+      const globalResult = searchGlobal(db, query, limit, {
+        status,
+        sprint,
+        since,
+        reposConfigured: config.project.vcs.repos.length > 0,
+      });
       return c.json({
         ...meta,
         query,
         scope,
         count: globalResult.results.length,
         results: globalResult.results,
+        codeSearchStatus: globalResult.codeSearchStatus,
+        help: globalResult.help,
       });
     }
 
@@ -440,6 +467,63 @@ export function createApp(config: Config) {
         url: page.url,
         sourceUpdatedAt: page.sourceUpdatedAt,
       })),
+    });
+  });
+
+  app.get('/repos', (c) => {
+    const db = getDb(config.TOONED_DATA_DIR);
+    const repos = listReposIndexed(db);
+    return c.json({
+      ...getIndexMeta(config),
+      count: repos.length,
+      repos,
+    });
+  });
+
+  app.get('/code', (c) => {
+    const db = getDb(config.TOONED_DATA_DIR);
+    const fileId = (c.req.query('fileId') ?? '').trim();
+    const accountId = (c.req.query('accountId') ?? '').trim();
+    const repository = (c.req.query('repository') ?? '').trim();
+    const path = (c.req.query('path') ?? '').trim();
+    const resolvedFileId =
+      fileId || (accountId && repository && path ? buildCodeFileId(accountId, repository, path) : '');
+
+    if (!resolvedFileId) {
+      return c.json(
+        {
+          error: 'fileId or accountId/repository/path query parameters are required',
+          ...getIndexMeta(config),
+        },
+        400,
+      );
+    }
+
+    const file = getCodeFile(db, resolvedFileId);
+    if (!file) {
+      return c.json(
+        {
+          error: `Code file not found: ${resolvedFileId}`,
+          ...getIndexMeta(config),
+        },
+        404,
+      );
+    }
+
+    return c.json({
+      ...getIndexMeta(config),
+      file: {
+        fileId: file.id,
+        accountId: file.accountId,
+        provider: file.provider,
+        repository: file.repository,
+        path: file.path,
+        ref: file.ref,
+        language: file.language,
+        sizeBytes: file.sizeBytes,
+        excerpt: (file.content ?? '').slice(0, 500),
+        content: file.content,
+      },
     });
   });
 

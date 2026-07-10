@@ -8,6 +8,9 @@ function mapSearchResult(row: {
   source?: 'story' | 'doc' | 'code';
   key?: string;
   pageId?: string;
+  fileId?: string;
+  repository?: string;
+  path?: string;
   title?: string;
   summary?: string | null;
   status?: string | null;
@@ -29,6 +32,16 @@ function mapSearchResult(row: {
       excerpt: row.excerpt ?? row.summary ?? '',
     };
   }
+  if (source === 'code') {
+    return {
+      source,
+      fileId: row.fileId ?? '',
+      repository: row.repository ?? '',
+      path: row.path ?? row.title ?? '',
+      title: row.title ?? row.path ?? '',
+      excerpt: row.excerpt ?? row.summary ?? '',
+    };
+  }
 
   return {
     source,
@@ -39,6 +52,23 @@ function mapSearchResult(row: {
     subtasks: row.subtasks ?? 0,
     prs: row.prs ?? 0,
   };
+}
+
+function searchHelp(scope: SearchScope): string[] {
+  if (scope === 'docs') {
+    return ['Run `tooned pages view <pageId>` for page details'];
+  }
+  if (scope === 'code') {
+    return ['Run `tooned code view <account>/<repo>:<path>` for file content'];
+  }
+  if (scope === 'all') {
+    return [
+      'Run `tooned stories view <KEY>` for story details',
+      'Run `tooned pages view <pageId>` for doc details',
+      'Run `tooned code view <account>/<repo>:<path>` for code details',
+    ];
+  }
+  return ['Run `tooned stories view <KEY>` for story details'];
 }
 
 export async function runSearch(
@@ -66,7 +96,7 @@ export async function runSearch(
       limit: options.limit,
     });
 
-    if (scope === 'code') {
+    if (scope === 'code' && result.codeSearchStatus) {
       console.log(
         formatToon(result.syncMeta, {
           query,
@@ -74,15 +104,20 @@ export async function runSearch(
           count: '0 matches',
           results: [],
           pageCount: result.pageCount,
-          codeSearchStatus: result.codeSearchStatus ?? 'not_configured',
-          help: result.help ?? ['Code search is not configured yet'],
+          codeSearchStatus: result.codeSearchStatus,
+          help: result.help ?? ['Code search is not available'],
         }),
       );
       return 0;
     }
 
     if (result.results.length === 0) {
-      console.log(formatEmptySearchToon(result.syncMeta, query, scope));
+      console.log(
+        formatEmptySearchToon(result.syncMeta, query, scope, {
+          codeSearchStatus: result.codeSearchStatus,
+          help: result.help,
+        }),
+      );
       return 0;
     }
 
@@ -93,15 +128,8 @@ export async function runSearch(
         pageCount: result.pageCount,
         count: `${result.count} matches`,
         results: result.results.map(mapSearchResult),
-        help:
-          scope === 'docs'
-            ? ['Run `tooned pages view <pageId>` for page details']
-            : scope === 'all'
-              ? [
-                  'Run `tooned stories view <KEY>` for story details',
-                  'Run `tooned pages view <pageId>` for doc details',
-                ]
-              : ['Run `tooned stories view <KEY>` for story details'],
+        ...(result.codeSearchStatus ? { codeSearchStatus: result.codeSearchStatus } : {}),
+        help: result.help ?? searchHelp(scope),
       }),
     );
     return 0;

@@ -8,9 +8,10 @@ import {
   rebuildConfluenceSearchRow,
   replacePageAttachments,
   replacePageRefs,
-  searchCodeStub,
+  searchCodeQuery,
   searchGlobal,
   searchPages,
+  upsertCodeFile,
   upsertConfluencePage,
 } from './db.js';
 
@@ -55,6 +56,29 @@ describe('confluence search', () => {
     rebuildConfluenceSearchRow(db, pageId);
   }
 
+  function seedCodeFile(
+    db: ReturnType<typeof getDb>,
+    accountId: string,
+    repository: string,
+    path: string,
+    content: string,
+  ) {
+    upsertCodeFile(db, {
+      id: `${accountId}:${repository}:${path}`,
+      accountId,
+      provider: 'github',
+      repository,
+      path,
+      ref: 'main',
+      language: 'typescript',
+      sizeBytes: content.length,
+      content,
+      contentHash: 'hash',
+      sourceUpdatedAt: null,
+      syncedAt: '2026-07-10T00:00:00.000Z',
+    });
+  }
+
   it('searches confluence pages via FTS', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'tooned-search-pages-'));
     const db = getDb(dataDir);
@@ -71,15 +95,38 @@ describe('confluence search', () => {
     seedStory(db, 'CRM-900', 'Workflow story', 'Story about workflow delivery');
     seedPage(db, '9002', 'Workflow Doc', 'Confluence workflow reference');
 
-    const result = searchGlobal(db, 'workflow', 10);
+    const result = searchGlobal(db, 'workflow', 10, { reposConfigured: false });
     expect(result.results.some((hit) => hit.source === 'story' && hit.key === 'CRM-900')).toBe(true);
     expect(result.results.some((hit) => hit.source === 'doc' && hit.pageId === '9002')).toBe(true);
   });
 
-  it('returns explicit empty code search state', () => {
-    const result = searchCodeStub();
+  it('returns federated story, doc, and code hits', () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'tooned-search-global-code-'));
+    const db = getDb(dataDir);
+    seedStory(db, 'CRM-901', 'Function story', 'Story about exported function helpers');
+    seedPage(db, '9003', 'Function Doc', 'Confluence function reference');
+    seedCodeFile(db, 'gh', 'acme/tools', 'src/function.ts', 'export function helper() {}');
+
+    const result = searchGlobal(db, 'function', 10, { reposConfigured: true });
+    expect(result.results.some((hit) => hit.source === 'story')).toBe(true);
+    expect(result.results.some((hit) => hit.source === 'doc')).toBe(true);
+    expect(result.results.some((hit) => hit.source === 'code' && hit.path === 'src/function.ts')).toBe(true);
+  });
+
+  it('returns help when code search is not configured', () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'tooned-search-code-empty-'));
+    const db = getDb(dataDir);
+    const result = searchCodeQuery(db, 'function', 10, false);
     expect(result.results).toEqual([]);
     expect(result.codeSearchStatus).toBe('not_configured');
     expect(result.help?.length).toBeGreaterThan(0);
+  });
+
+  it('returns empty state when repos are configured but not indexed', () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'tooned-search-code-unindexed-'));
+    const db = getDb(dataDir);
+    const result = searchCodeQuery(db, 'function', 10, true);
+    expect(result.results).toEqual([]);
+    expect(result.codeSearchStatus).toBe('empty');
   });
 });

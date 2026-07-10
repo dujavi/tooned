@@ -814,21 +814,84 @@ export interface GlobalSearchHit {
   source: GlobalSearchSource;
   key?: string;
   pageId?: string;
+  fileId?: string;
+  repository?: string;
+  path?: string;
   title: string;
   summary?: string | null;
   status?: string | null;
   spaceKey?: string | null;
   url?: string | null;
   sourceUpdatedAt?: string | null;
+  excerpt?: string | null;
   comments?: number;
   subtasks?: number;
   prs?: number;
 }
 
+export type CodeSearchStatus = 'not_configured' | 'empty';
+
 export interface GlobalSearchResult {
   results: GlobalSearchHit[];
-  codeSearchStatus?: 'not_configured';
+  codeSearchStatus?: CodeSearchStatus;
   help?: string[];
+}
+
+const GLOBAL_SEARCH_PER_SOURCE_CAP = 10;
+
+export function buildCodeSearchMeta(
+  reposConfigured: boolean,
+  codeFileCount: number,
+): Pick<GlobalSearchResult, 'codeSearchStatus' | 'help'> {
+  if (!reposConfigured) {
+    return {
+      codeSearchStatus: 'not_configured',
+      help: [
+        'Code search is not configured',
+        'Add vcs.repos targets to tooned.yaml and run `tooned sync --force`',
+        'Run `tooned search "<query>" --in all` for stories and docs meanwhile',
+      ],
+    };
+  }
+  if (codeFileCount === 0) {
+    return {
+      codeSearchStatus: 'empty',
+      help: [
+        'Configured repositories are not indexed yet',
+        'Run `tooned sync --force` to crawl repositories',
+        'Run `tooned repos list` to verify indexed repos after sync',
+      ],
+    };
+  }
+  return {};
+}
+
+function mapCodeSearchHit(row: CodeSearchResultRow): GlobalSearchHit {
+  return {
+    source: 'code',
+    fileId: row.fileId,
+    title: row.path,
+    repository: row.repository,
+    path: row.path,
+    summary: row.excerpt,
+    excerpt: row.excerpt,
+  };
+}
+
+export function searchCodeQuery(
+  db: Db,
+  query: string,
+  limit: number,
+  reposConfigured: boolean,
+): GlobalSearchResult {
+  const codeFileCount = getCodeFileCount(db);
+  const meta = buildCodeSearchMeta(reposConfigured, codeFileCount);
+  if (meta.codeSearchStatus) {
+    return { results: [], ...meta };
+  }
+  return {
+    results: searchCode(db, query, limit).map(mapCodeSearchHit),
+  };
 }
 
 export function searchPages(db: Db, query: string, limit: number): PageSearchResultRow[] {
@@ -856,9 +919,16 @@ export function searchGlobal(
   db: Db,
   query: string,
   limit: number,
-  options?: { status?: string; sprint?: string; since?: string },
+  options?: {
+    status?: string;
+    sprint?: string;
+    since?: string;
+    reposConfigured?: boolean;
+  },
 ): GlobalSearchResult {
-  const storyHits = searchStories(db, query, limit, options).map(
+  const perSourceLimit = Math.min(limit, GLOBAL_SEARCH_PER_SOURCE_CAP);
+  const reposConfigured = options?.reposConfigured ?? false;
+  const storyHits = searchStories(db, query, perSourceLimit, options).map(
     (row): GlobalSearchHit => ({
       source: 'story',
       key: row.key,
@@ -871,7 +941,7 @@ export function searchGlobal(
       prs: row.prs,
     }),
   );
-  const docHits = searchPages(db, query, limit).map(
+  const docHits = searchPages(db, query, perSourceLimit).map(
     (row): GlobalSearchHit => ({
       source: 'doc',
       pageId: row.pageId,
@@ -880,24 +950,22 @@ export function searchGlobal(
       url: row.url,
       sourceUpdatedAt: row.sourceUpdatedAt,
       summary: row.excerpt,
+      excerpt: row.excerpt,
     }),
   );
+  const codeMeta = buildCodeSearchMeta(reposConfigured, getCodeFileCount(db));
+  const codeHits = codeMeta.codeSearchStatus
+    ? []
+    : searchCode(db, query, perSourceLimit).map(mapCodeSearchHit);
 
   return {
-    results: [...storyHits, ...docHits],
+    results: [...storyHits, ...docHits, ...codeHits],
+    ...(codeHits.length === 0 ? codeMeta : {}),
   };
 }
 
 export function searchCodeStub(): GlobalSearchResult {
-  return {
-    results: [],
-    codeSearchStatus: 'not_configured',
-    help: [
-      'Code search is not configured yet',
-      'Complete the repo-crawl track to index repositories',
-      'Run `tooned search "<query>" --in all` for stories and docs meanwhile',
-    ],
-  };
+  return { results: [], ...buildCodeSearchMeta(false, 0) };
 }
 
 export interface CodeFileUpsertInput {

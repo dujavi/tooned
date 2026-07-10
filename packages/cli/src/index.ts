@@ -20,6 +20,8 @@ import {
 } from './commands/stories.js';
 import { runSyncCommand } from './commands/sync.js';
 import { runPagesList, runPagesView } from './commands/pages.js';
+import { runReposList } from './commands/repos.js';
+import { runCodeView } from './commands/code.js';
 import { collapseHomePath, formatUnknownFlagToon, formatToon } from './output.js';
 import {
   closeDb,
@@ -74,6 +76,8 @@ const FLAG_RULES: FlagValidationRule[] = [
   { command: 'search', path: ['search'], flags: ['--in', '--sprint', '--status', '--since', '--limit'] },
   { command: 'pages list', path: ['pages', 'list'], flags: ['--space', '--limit'] },
   { command: 'pages view', path: ['pages', 'view'], flags: ['--full'] },
+  { command: 'repos list', path: ['repos', 'list'], flags: [] },
+  { command: 'code view', path: ['code', 'view'], flags: ['--full'] },
   { command: 'refs search', path: ['refs', 'search'], flags: [] },
 ];
 
@@ -363,7 +367,7 @@ program
   .option('--limit <n>', 'Limit rows', (value) => Number.parseInt(value, 10), 20)
   .addHelpText(
     'after',
-    '\nExamples:\n  tooned search workflow --in docs\n  tooned search workflow --in all\n  tooned search "evaluate dod" --in comments',
+    '\nExamples:\n  tooned search workflow --in docs\n  tooned search workflow --in all\n  tooned search function --in code\n  tooned search "evaluate dod" --in comments',
   )
   .action(
     async (
@@ -409,6 +413,28 @@ pages
   .addHelpText('after', '\nExamples:\n  tooned pages view 1007157249\n  tooned pages view 1007157249 --full')
   .action(async (pageIdOrUrl: string, options: { full?: boolean }) => {
     const exitCode = await runPagesView(pageIdOrUrl, { full: Boolean(options.full) });
+    process.exit(exitCode);
+  });
+
+const repos = program.command('repos').description('Indexed repository commands');
+repos
+  .command('list')
+  .description('List indexed repositories and file counts')
+  .addHelpText('after', '\nExamples:\n  tooned repos list')
+  .action(async () => {
+    const exitCode = await runReposList();
+    process.exit(exitCode);
+  });
+
+const code = program.command('code').description('Indexed code file commands');
+code
+  .command('view')
+  .description('View an indexed code file')
+  .argument('<accountRepoPath>', 'Format: <account>/<repository>:<path>')
+  .option('--full', 'Show full file content')
+  .addHelpText('after', '\nExamples:\n  tooned code view gh/acme/tools:README.md\n  tooned code view gh/acme/tools:src/index.ts --full')
+  .action(async (accountRepoPath: string, options: { full?: boolean }) => {
+    const exitCode = await runCodeView(accountRepoPath, { full: Boolean(options.full) });
     process.exit(exitCode);
   });
 

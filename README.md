@@ -55,6 +55,16 @@ fields:
 
 Custom field IDs vary per Jira Cloud instance. Discover them via **Jira Settings → Issues → Custom fields** or `GET /rest/api/3/field`.
 
+### Search scopes
+
+| Scope | Example |
+|---|---|
+| All sources | `tooned search "workflow" --in all` |
+| Jira stories | `tooned search "CRM-101" --in stories` |
+| Confluence docs | `tooned search "onboarding" --in docs` |
+| Indexed code | `tooned search "function" --in code` |
+| Comments / notes | `tooned search "blocked" --in comments` |
+
 ## Commands
 
 | Command | Description |
@@ -69,7 +79,11 @@ Custom field IDs vary per Jira Cloud instance. Discover them via **Jira Settings
 | `tooned sprint next --review-pack` | Next sprint planning + review pack |
 | `tooned stories list --limit 20` | Story list with filters |
 | `tooned stories sizing <KEY>` | Compute points, DoD gaps, and open questions |
-| `tooned search "<query>" --in all` | Search summary, comments, and notes |
+| `tooned search "<query>" --in all` | Search stories, Confluence docs, and indexed code |
+| `tooned search "<query>" --in code` | Search indexed repository files |
+| `tooned repos list` | List indexed repositories with file counts |
+| `tooned code view <account>/<repo>:<path>` | View indexed file content |
+| `tooned pages list --space CRM --limit 20` | Browse synced Confluence pages |
 | `tooned refs search <query>` | Search extracted links and refs |
 | `tooned setup hooks` | Install/repair Cursor SessionStart hook |
 
@@ -104,8 +118,9 @@ pnpm generate:skill --check
 | `@tooned/sync` | SQLite schema and migrations |
 | `@tooned/service` | Hono HTTP service |
 | `@tooned/cli` | `tooned` CLI |
-| `@tooned/bitbucket` | Phase 3 stub |
-| `@tooned/github` | Phase 3 stub |
+| `@tooned/bitbucket` | Bitbucket API client |
+| `@tooned/github` | GitHub API client |
+| `@tooned/confluence` | Confluence page crawl client |
 
 ## Development
 

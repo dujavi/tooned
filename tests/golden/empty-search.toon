@@ -3,4 +3,4 @@ syncMeta:
   dataAgeSeconds: 60
   syncStatus: idle
 search: "0 results found for \"modal\""
-help[2]: "Run `tooned search \"<query>\" --in stories` for Jira stories only","Run `tooned search \"<query>\" --in docs` for Confluence pages"
+help[3]: "Run `tooned search \"<query>\" --in stories` for Jira stories only","Run `tooned search \"<query>\" --in docs` for Confluence pages","Run `tooned search \"<query>\" --in code` for indexed repositories"

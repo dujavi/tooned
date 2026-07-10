@@ -1,5 +1,5 @@
 export const TOONED_HOME_DESCRIPTION =
-  'Inspect synced Jira stories, Confluence docs, and sprint delivery state';
+  'Inspect synced Jira stories, Confluence docs, indexed code, and sprint delivery state';
 
 export interface HomeViewInput {
   bin: string;
@@ -26,8 +26,9 @@ export function buildHomeViewPayload(input: HomeViewInput): Record<string, unkno
     help: input.serviceRunning
       ? [
           'Run `tooned sprint current --workload` to inspect current sprint',
-          'Run `tooned search "<query>" --in all` to search stories and docs',
+          'Run `tooned search "<query>" --in all` to search stories, docs, and code',
           'Run `tooned pages list --space CRM --limit 20` to browse Confluence pages',
+          'Run `tooned repos list` to browse indexed repositories',
         ]
       : [
           'Run `tooned serve` to start the sync service',
@@ -42,6 +43,6 @@ export function buildSkillCommandExamples(): string[] {
     'npx -y @tooned/cli sprint current --workload',
     'npx -y @tooned/cli stories list --status "In Progress" --limit 20',
     'npx -y @tooned/cli search "<query>" --in all',
-    'npx -y @tooned/cli pages list --space CRM --limit 20',
+    'npx -y @tooned/cli repos list',
   ];
 }

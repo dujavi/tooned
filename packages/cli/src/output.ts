@@ -88,6 +88,10 @@ export function formatEmptySearchToon(
   syncMeta: SyncMeta,
   query: string,
   scope: 'all' | 'stories' | 'docs' | 'code' | 'comments' | 'notes' = 'all',
+  extra?: {
+    codeSearchStatus?: 'not_configured' | 'empty';
+    help?: string[];
+  },
 ): string {
   const scopeLabel =
     scope === 'docs'
@@ -103,12 +107,17 @@ export function formatEmptySearchToon(
               : 'results';
   return formatToon(syncMeta, {
     search: `0 ${scopeLabel} found for "${query}"`,
+    ...(extra?.codeSearchStatus ? { codeSearchStatus: extra.codeSearchStatus } : {}),
     help:
-      scope === 'all'
+      extra?.help ??
+      (scope === 'all'
         ? [
             'Run `tooned search "<query>" --in stories` for Jira stories only',
             'Run `tooned search "<query>" --in docs` for Confluence pages',
+            'Run `tooned search "<query>" --in code` for indexed repositories',
           ]
-        : ['Try `tooned search "<query>" --in all` to search stories and docs together'],
+        : scope === 'code'
+          ? ['Run `tooned repos list` to verify indexed repositories']
+          : ['Try `tooned search "<query>" --in all` to search stories, docs, and code together']),
   });
 }
