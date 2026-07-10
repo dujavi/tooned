@@ -3,6 +3,7 @@ import {
   detectLanguage,
   hasDeniedPathSegment,
   isDeniedExtension,
+  isDeniedSecretBasename,
   isTextSourcePath,
   shouldCrawlSourceFile,
 } from './repo-crawl-policy.js';
@@ -13,6 +14,8 @@ describe('repo crawl policy', () => {
     expect(hasDeniedPathSegment('dist/index.js')).toBe(true);
     expect(isDeniedExtension('assets/logo.png')).toBe(true);
     expect(isDeniedExtension('pnpm-lock.yaml')).toBe(true);
+    expect(isDeniedSecretBasename('.env')).toBe(true);
+    expect(isDeniedSecretBasename('config/.env.local')).toBe(true);
   });
 
   it('allows typical source files', () => {

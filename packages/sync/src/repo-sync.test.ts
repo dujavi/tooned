@@ -164,6 +164,7 @@ describe('runRepoSync', () => {
             ref: 'main',
             paths: ['src/index.ts', 'README.md'],
             nextIndex: 1,
+            sourceKind: 'api',
           },
         },
       }),

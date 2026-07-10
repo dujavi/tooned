@@ -46,11 +46,14 @@ vcs:
   #     tokenEnv: GITHUB_TOKEN
   # repos:
   #   - account: bb-main
-  #     scope: workspace
-  #   - account: gh-org
   #     slug: my-repo
+  #     localPath: ~/code/my-repo   # optional: index from local checkout (see README security notes)
+  #     source: cache               # auto | local | cache | api
+  #   - account: bb-main
+  #     scope: workspace
   accounts: []
   repos: []
+  # repoCacheDir: ./data/repo-cache  # optional git clone cache (default: TOONED_DATA_DIR/repo-cache)
   maxFileBytes: 262144
 
 # Confluence page crawl settings (uses same ATLASSIAN_* credentials as Jira).

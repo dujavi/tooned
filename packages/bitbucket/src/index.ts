@@ -187,7 +187,7 @@ async function listDirectoryEntries(
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join('/');
-  const suffix = encodedPrefix ? `/${encodedPrefix}` : '';
+  const suffix = encodedPrefix ? `/${encodedPrefix}` : '/';
   const entries = await paginate<BitbucketSrcEntry>(
     auth,
     `/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repoSlug)}/src/${encodeURIComponent(ref)}${suffix}?pagelen=100`,
@@ -337,7 +337,7 @@ export function createBitbucketClientFromAuth(auth: BitbucketAuth): VcsClient {
 }
 
 export function isBitbucketConfigured(config: Config): boolean {
-  return Boolean(config.BITBUCKET_USERNAME && config.BITBUCKET_TOKEN);
+  return Boolean((config.BITBUCKET_USERNAME ?? config.ATLASSIAN_EMAIL) && config.BITBUCKET_TOKEN);
 }
 
 export function createBitbucketClient(config: Config): VcsClient | null {
@@ -346,7 +346,7 @@ export function createBitbucketClient(config: Config): VcsClient | null {
   }
   return createBitbucketClientFromAuth({
     accountId: 'default',
-    username: config.BITBUCKET_USERNAME!,
+    username: config.BITBUCKET_USERNAME ?? config.ATLASSIAN_EMAIL,
     token: config.BITBUCKET_TOKEN!,
     workspace: config.BITBUCKET_WORKSPACE,
   });

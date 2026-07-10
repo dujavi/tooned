@@ -9,16 +9,23 @@ export const VcsAccountSchema = z.object({
   tokenEnv: z.string().min(1),
 });
 
+const VcsRepoSlugTargetSchema = z.object({
+  account: z.string().min(1),
+  slug: z.string().min(1),
+  localPath: z.string().min(1).optional(),
+  source: z.enum(['auto', 'api', 'local', 'cache']).optional(),
+});
+
 export const VcsRepoTargetSchema = z.union([
-  z.object({
-    account: z.string().min(1),
-    slug: z.string().min(1),
-  }),
+  VcsRepoSlugTargetSchema,
   z.object({
     account: z.string().min(1),
     scope: z.enum(['workspace', 'org']),
   }),
 ]);
+
+export type VcsRepoSlugTarget = z.infer<typeof VcsRepoSlugTargetSchema>;
+export type RepoSourceMode = VcsRepoSlugTarget['source'];
 
 export type VcsAccountConfig = z.infer<typeof VcsAccountSchema>;
 export type VcsRepoTarget = z.infer<typeof VcsRepoTargetSchema>;
@@ -38,6 +45,7 @@ export const VcsConfigSchema = z
       .default({ form: [], confluence: [] }),
     accounts: z.array(VcsAccountSchema).default([]),
     repos: z.array(VcsRepoTargetSchema).default([]),
+    repoCacheDir: z.string().min(1).optional(),
     maxFileBytes: z.number().int().positive().default(262_144),
   })
   .superRefine((value, ctx) => {
@@ -117,7 +125,10 @@ export function resolveVcsAccounts(input: {
 
   return accounts.map((account) => {
     const token = env[account.tokenEnv]?.trim() ?? '';
-    const username = account.usernameEnv ? env[account.usernameEnv]?.trim() : undefined;
+    let username = account.usernameEnv ? env[account.usernameEnv]?.trim() : undefined;
+    if (account.provider === 'bitbucket' && !username) {
+      username = env.ATLASSIAN_EMAIL?.trim();
+    }
     return {
       id: account.id,
       provider: account.provider,
@@ -142,7 +153,13 @@ export function summarizeVcsRepoTargets(repos: VcsRepoTarget[]): string {
   }
   const parts = repos.map((repo) => {
     if ('slug' in repo) {
-      return `${repo.account}:${repo.slug}`;
+      const suffix =
+        repo.localPath !== undefined
+          ? `@${repo.localPath}${repo.source && repo.source !== 'auto' ? ` (${repo.source})` : ''}`
+          : repo.source && repo.source !== 'auto'
+            ? ` (${repo.source})`
+            : '';
+      return `${repo.account}:${repo.slug}${suffix}`;
     }
     return `${repo.account}:${repo.scope}`;
   });

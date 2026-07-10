@@ -60,6 +60,22 @@ describe('vcs config', () => {
     expect(resolved[0]?.token).toBe('secret');
   });
 
+  it('falls back to ATLASSIAN_EMAIL for bitbucket username', () => {
+    const resolved = resolveVcsAccounts({
+      accounts: [
+        {
+          id: 'bb',
+          provider: 'bitbucket',
+          workspace: 'acme',
+          tokenEnv: 'BB_TOKEN',
+        },
+      ],
+      env: { ATLASSIAN_EMAIL: 'user@example.com', BB_TOKEN: 'secret' },
+    });
+    expect(resolved[0]?.username).toBe('user@example.com');
+    expect(resolved[0]?.configured).toBe(true);
+  });
+
   it('summarizes repo crawl targets', () => {
     expect(summarizeVcsRepoTargets([])).toBe('no repo crawl targets configured');
     expect(

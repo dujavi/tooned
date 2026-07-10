@@ -54,6 +54,8 @@ export {
   type VcsConfig,
   type VcsAccountConfig,
   type VcsRepoTarget,
+  type VcsRepoSlugTarget,
+  type RepoSourceMode,
   type ResolvedVcsAccount,
 } from './vcs-config.js';
 export {

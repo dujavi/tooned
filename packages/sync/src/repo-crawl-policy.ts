@@ -156,6 +156,14 @@ function baseName(path: string): string {
   return path.split('/').pop() ?? path;
 }
 
+export function isDeniedSecretBasename(path: string): boolean {
+  const name = baseName(path).toLowerCase();
+  if (name === '.env' || name === '.env.local' || name === '.env.development' || name === '.env.production') {
+    return true;
+  }
+  return name.startsWith('.env.');
+}
+
 export function hasDeniedPathSegment(path: string): boolean {
   const segments = path.split('/').filter(Boolean);
   return segments.some((segment) => DENIED_PATH_SEGMENTS.has(segment));
@@ -200,7 +208,7 @@ export function looksLikeTextContent(content: string): boolean {
 }
 
 export function shouldCrawlSourceFile(path: string, content: string): boolean {
-  if (hasDeniedPathSegment(path) || isDeniedExtension(path)) {
+  if (isDeniedSecretBasename(path) || hasDeniedPathSegment(path) || isDeniedExtension(path)) {
     return false;
   }
   if (isTextSourcePath(path)) {

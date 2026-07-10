@@ -39,6 +39,44 @@ Set `TOONED_CONFIG_PATH` to use a preset from `examples/` instead of `./tooned.y
 
 See `.env.example` for optional variables.
 
+### Bitbucket repo sync (optional)
+
+Bitbucket Cloud now uses **API tokens** instead of app passwords. Tooned authenticates with HTTP Basic auth: your **Atlassian account email** plus a **Bitbucket API token**.
+
+1. Go to [id.atlassian.com → Security → API tokens](https://id.atlassian.com/manage-profile/security/api-tokens)
+2. Create a token with **Bitbucket** scopes — at minimum `read:repository:bitbucket` for repo crawl
+3. Set `BITBUCKET_TOKEN` in `.env` (username comes from `ATLASSIAN_EMAIL` automatically)
+
+`BITBUCKET_WORKSPACE` can live in `.env` or `tooned.yaml` under `vcs.bitbucket.workspace`.
+
+### Repo indexing sources
+
+Each repo slug can be indexed from multiple sources. Set `source` on the repo entry:
+
+| Source | Behavior |
+|---|---|
+| `auto` (default) | Use `localPath` when it exists, else git cache, else REST API |
+| `local` | Require `localPath` — read files from disk (`git ls-files` when `.git` exists) |
+| `cache` | Shallow clone/pull into `TOONED_DATA_DIR/repo-cache/{account}/{slug}` |
+| `api` | REST API only (headless; subject to Bitbucket rate limits) |
+
+Git cache and API sources clone or fetch tracked repository content only (`git ls-files`), so `.gitignore` rules apply the same way.
+
+**Security — `localPath`:** Only use `localPath` when you understand what gets indexed:
+
+- **Git checkout:** Tooned uses `git ls-files`, so untracked files (e.g. local `.env`, `node_modules/`) are excluded. **Tracked** secrets, data files, or `node_modules` can still be indexed if they were committed.
+- **Non-git directory:** `.gitignore` is **not** applied — only built-in denylists (e.g. `node_modules/`, `.env`). Secrets or local data on disk may leak into the search index.
+
+Prefer `source: cache` for a dedicated clone under `data/repo-cache/` that won't touch your active dev checkout.
+
+```yaml
+vcs:
+  repos:
+    - account: default
+      slug: kti-forms
+      source: cache
+```
+
 ### `tooned.yaml` essentials
 
 ```yaml
@@ -75,6 +113,8 @@ Custom field IDs vary per Jira Cloud instance. Discover them via **Jira Settings
 | `tooned doctor --verbose` | Fetch board filter JQL, optional bootstrap JQL check, story count |
 | `tooned status` | Show sync metadata and local story count |
 | `tooned sync --force` | Force bootstrap + delta sync |
+| `tooned sync --repos --force` | Re-crawl configured repositories only |
+| `tooned sync --jira --confluence` | Sync Jira and Confluence, skip repos |
 | `tooned sprint current --workload` | Current sprint workload summary |
 | `tooned sprint next --review-pack` | Next sprint planning + review pack |
 | `tooned stories list --limit 20` | Story list with filters |

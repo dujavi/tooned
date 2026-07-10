@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Config } from '@tooned/core';
-import { getResolvedVcsAccounts, getVcsClient, type VcsRepoTarget } from '@tooned/core';
-import type { VcsClient, VcsProvider } from '@tooned/core';
+import type { Config, RepoSourceMode, VcsRepoTarget } from '@tooned/core';
+import { getResolvedVcsAccounts, getVcsClient, type VcsProvider } from '@tooned/core';
 import '@tooned/bitbucket';
 import '@tooned/github';
 import {
@@ -20,6 +19,13 @@ import {
   detectLanguage,
   shouldCrawlSourceFile,
 } from './repo-crawl-policy.js';
+import {
+  listCrawlablePathsFromHandle,
+  readSourceFileFromHandle,
+  resolveRepoContentHandle,
+  type RepoContentHandle,
+  type RepoContentTarget,
+} from './repo-source.js';
 
 export const CODE_BOOTSTRAP_COMPLETE_KEY = 'codeBootstrapComplete';
 export const CODE_BOOTSTRAP_CHECKPOINT_KEY = 'codeBootstrapCheckpoint';
@@ -37,17 +43,11 @@ export interface RepoSyncResult {
   bootstrapComplete: boolean;
 }
 
-interface ConcreteRepoTarget {
-  accountId: string;
-  provider: VcsProvider;
-  repository: string;
-  defaultBranch: string | null;
-}
-
 interface RepoCheckpointEntry {
   ref: string;
   paths: string[];
   nextIndex: number;
+  sourceKind?: RepoContentHandle['kind'];
 }
 
 interface CodeBootstrapCheckpoint {
@@ -85,28 +85,45 @@ function buildRepositoryName(
   return org ? `${org}/${slug}` : null;
 }
 
-async function expandRepoTargets(config: Config): Promise<ConcreteRepoTarget[]> {
+function isSlugTarget(target: VcsRepoTarget): target is VcsRepoTarget & {
+  slug: string;
+  source?: RepoSourceMode;
+  localPath?: string;
+} {
+  return 'slug' in target;
+}
+
+function isScopeTarget(target: VcsRepoTarget): target is { account: string; scope: 'workspace' | 'org' } {
+  return 'scope' in target;
+}
+
+function requiresApiCredentials(source: RepoSourceMode, localPath?: string): boolean {
+  if (source === 'api') {
+    return true;
+  }
+  if (source === 'local' || source === 'cache') {
+    return false;
+  }
+  return localPath === undefined;
+}
+
+async function expandRepoTargets(config: Config): Promise<RepoContentTarget[]> {
   const targets = config.project.vcs.repos;
   if (targets.length === 0) {
     return [];
   }
 
-  const expanded: ConcreteRepoTarget[] = [];
+  const expanded: RepoContentTarget[] = [];
   const seen = new Set<string>();
 
   for (const target of targets) {
-    const client = getVcsClient(config, target.account);
-    if (!client) {
-      console.warn(`warn: skipping repo crawl for account "${target.account}": missing credentials`);
-      continue;
-    }
-
     const account = getResolvedVcsAccounts(config).find((entry) => entry.id === target.account);
     if (!account) {
       continue;
     }
 
     if (isSlugTarget(target)) {
+      const source = target.source ?? 'auto';
       const repository = buildRepositoryName(config, target.account, account.provider, target.slug);
       if (!repository) {
         console.warn(
@@ -114,17 +131,60 @@ async function expandRepoTargets(config: Config): Promise<ConcreteRepoTarget[]> 
         );
         continue;
       }
+
+      if (source === 'local' && !target.localPath) {
+        console.warn(
+          `warn: skipping repo crawl for ${target.account}:${target.slug}: source=local requires localPath`,
+        );
+        continue;
+      }
+
+      const client = getVcsClient(config, target.account);
+      if (requiresApiCredentials(source, target.localPath) && !client) {
+        console.warn(`warn: skipping repo crawl for account "${target.account}": missing credentials`);
+        continue;
+      }
+
       const key = repoKey(target.account, repository);
       if (seen.has(key)) {
         continue;
       }
       seen.add(key);
+
+      let defaultBranch: string | null = null;
+      if (client) {
+        try {
+          const workspace =
+            account.workspace ?? config.BITBUCKET_WORKSPACE ?? repository.split('/')[0] ?? '';
+          const repositories = await client.listRepositories(workspace);
+          const match = repositories.find(
+            (repo) => repo.fullName === repository || repo.slug === target.slug,
+          );
+          defaultBranch = match?.defaultBranch ?? null;
+        } catch {
+          // resolveRepoContentHandle falls back when branch lookup fails.
+        }
+      }
+
       expanded.push({
         accountId: target.account,
         provider: account.provider,
         repository,
-        defaultBranch: null,
+        slug: target.slug,
+        defaultBranch,
+        localPath: target.localPath,
+        source,
       });
+      continue;
+    }
+
+    const client = getVcsClient(config, target.account);
+    if (!client) {
+      console.warn(`warn: skipping repo crawl for account "${target.account}": missing credentials`);
+      continue;
+    }
+
+    if (!isScopeTarget(target)) {
       continue;
     }
 
@@ -151,7 +211,9 @@ async function expandRepoTargets(config: Config): Promise<ConcreteRepoTarget[]> 
           accountId: target.account,
           provider: account.provider,
           repository: repository.fullName,
+          slug: repository.slug,
           defaultBranch: repository.defaultBranch,
+          source: 'api',
         });
       }
     } catch (error) {
@@ -161,39 +223,6 @@ async function expandRepoTargets(config: Config): Promise<ConcreteRepoTarget[]> 
   }
 
   return expanded;
-}
-
-function isSlugTarget(target: VcsRepoTarget): target is { account: string; slug: string } {
-  return 'slug' in target;
-}
-
-async function resolveRef(client: VcsClient, target: ConcreteRepoTarget): Promise<string> {
-  if (target.defaultBranch) {
-    return target.defaultBranch;
-  }
-  const [ownerOrWorkspace] = target.repository.split('/');
-  if (!ownerOrWorkspace) {
-    return 'main';
-  }
-  try {
-    const repositories = await client.listRepositories(ownerOrWorkspace);
-    const match = repositories.find((repo) => repo.fullName === target.repository);
-    if (match?.defaultBranch) {
-      return match.defaultBranch;
-    }
-  } catch {
-    // Fall back to main when branch lookup fails.
-  }
-  return 'main';
-}
-
-async function listCrawlablePaths(
-  client: VcsClient,
-  repository: string,
-  ref: string,
-): Promise<string[]> {
-  const entries = await client.listSourcePaths({ repository, ref });
-  return entries.filter((entry) => entry.type === 'file').map((entry) => entry.path);
 }
 
 function writeRepoManifest(
@@ -226,20 +255,21 @@ function writeRepoManifest(
 async function syncRepository(input: {
   db: Db;
   config: Config;
-  client: VcsClient;
-  target: ConcreteRepoTarget;
+  handle: RepoContentHandle;
+  target: RepoContentTarget;
   checkpoint: CodeBootstrapCheckpoint;
   maxFileBytes: number;
 }): Promise<{ filesIndexed: number; filesSkipped: number; filesFailed: number }> {
   const key = repoKey(input.target.accountId, input.target.repository);
-  const ref = input.checkpoint.repos[key]?.ref ?? (await resolveRef(input.client, input.target));
-  let paths = input.checkpoint.repos[key]?.paths;
-  let nextIndex = input.checkpoint.repos[key]?.nextIndex ?? 0;
+  const checkpointEntry = input.checkpoint.repos[key];
+  const ref = checkpointEntry?.ref ?? input.handle.ref;
+  let paths = checkpointEntry?.paths;
+  let nextIndex = checkpointEntry?.nextIndex ?? 0;
 
-  if (!paths) {
-    paths = await listCrawlablePaths(input.client, input.target.repository, ref);
+  if (!paths || checkpointEntry?.sourceKind !== input.handle.kind) {
+    paths = await listCrawlablePathsFromHandle(input.handle);
     nextIndex = 0;
-    input.checkpoint.repos[key] = { ref, paths, nextIndex };
+    input.checkpoint.repos[key] = { ref, paths, nextIndex, sourceKind: input.handle.kind };
     input.checkpoint.updatedAt = nowIso();
     setSyncStateValue(input.db, CODE_BOOTSTRAP_CHECKPOINT_KEY, input.checkpoint);
   }
@@ -257,11 +287,7 @@ async function syncRepository(input: {
   for (let index = nextIndex; index < paths.length; index += 1) {
     const path = paths[index]!;
     try {
-      const content = await input.client.getSourceFile({
-        repository: input.target.repository,
-        path,
-        ref,
-      });
+      const content = await readSourceFileFromHandle(input.handle, path);
       const sizeBytes = contentByteLength(content);
       if (sizeBytes > input.maxFileBytes) {
         filesSkipped += 1;
@@ -303,6 +329,7 @@ async function syncRepository(input: {
       ref,
       paths,
       nextIndex: index + 1,
+      sourceKind: input.handle.kind,
     };
     input.checkpoint.updatedAt = nowIso();
     setSyncStateValue(input.db, CODE_BOOTSTRAP_CHECKPOINT_KEY, input.checkpoint);
@@ -389,14 +416,25 @@ export async function runRepoSync(
   let filesFailed = 0;
 
   for (const target of targets) {
+    const account = getResolvedVcsAccounts(config).find((entry) => entry.id === target.accountId);
+    if (!account) {
+      continue;
+    }
     const client = getVcsClient(config, target.accountId);
-    if (!client) {
+    const handle = await resolveRepoContentHandle({
+      config,
+      target,
+      account,
+      client,
+    });
+    if (!handle) {
+      console.warn(`warn: skipping repo crawl for ${target.repository}: no content source available`);
       continue;
     }
     const result = await syncRepository({
       db,
       config,
-      client,
+      handle,
       target,
       checkpoint,
       maxFileBytes,
