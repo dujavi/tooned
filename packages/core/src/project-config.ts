@@ -27,6 +27,7 @@ export const ProjectConfigSchema = z.object({
     urlDomains: { form: [], confluence: [] },
     accounts: [],
     repos: [],
+    maxFileBytes: 262_144,
   }),
   confluence: z
     .object({

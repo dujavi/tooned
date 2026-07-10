@@ -900,4 +900,195 @@ export function searchCodeStub(): GlobalSearchResult {
   };
 }
 
+export interface CodeFileUpsertInput {
+  id: string;
+  accountId: string;
+  provider: string;
+  repository: string;
+  path: string;
+  ref: string;
+  language: string | null;
+  sizeBytes: number;
+  content: string;
+  contentHash: string;
+  sourceUpdatedAt: string | null;
+  syncedAt: string;
+}
+
+export interface CodeFileRow {
+  id: string;
+  accountId: string;
+  provider: string;
+  repository: string;
+  path: string;
+  ref: string;
+  language: string | null;
+  sizeBytes: number | null;
+  content: string | null;
+  contentHash: string | null;
+  sourceUpdatedAt: string | null;
+  syncedAt: string | null;
+}
+
+export interface IndexedRepoRow {
+  accountId: string;
+  provider: string;
+  repository: string;
+  ref: string;
+  fileCount: number;
+}
+
+export interface CodeSearchResultRow {
+  fileId: string;
+  repository: string;
+  path: string;
+  excerpt: string | null;
+}
+
+export function buildCodeFileId(accountId: string, repository: string, path: string): string {
+  return `${accountId}:${repository}:${path}`;
+}
+
+export function upsertCodeFile(db: Db, file: CodeFileUpsertInput): void {
+  db.prepare(
+    `INSERT INTO code_files (
+       id, account_id, provider, repository, path, ref, language, size_bytes, content, content_hash, source_updated_at, synced_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       account_id = excluded.account_id,
+       provider = excluded.provider,
+       repository = excluded.repository,
+       path = excluded.path,
+       ref = excluded.ref,
+       language = excluded.language,
+       size_bytes = excluded.size_bytes,
+       content = excluded.content,
+       content_hash = excluded.content_hash,
+       source_updated_at = excluded.source_updated_at,
+       synced_at = excluded.synced_at`,
+  ).run(
+    file.id,
+    file.accountId,
+    file.provider,
+    file.repository,
+    file.path,
+    file.ref,
+    file.language,
+    file.sizeBytes,
+    file.content,
+    file.contentHash,
+    file.sourceUpdatedAt,
+    file.syncedAt,
+  );
+  rebuildCodeSearchRow(db, file.id);
+}
+
+export function rebuildCodeSearchRow(db: Db, fileId: string): void {
+  const row = db
+    .prepare(
+      `SELECT id, repository, path, content
+       FROM code_files
+       WHERE id = ?`,
+    )
+    .get(fileId) as { id: string; repository: string; path: string; content: string | null } | undefined;
+  if (!row) {
+    db.prepare('DELETE FROM code_search WHERE file_id = ?').run(fileId);
+    return;
+  }
+  db.prepare('DELETE FROM code_search WHERE file_id = ?').run(fileId);
+  db.prepare(
+    'INSERT INTO code_search (file_id, repository, path, content) VALUES (?, ?, ?, ?)',
+  ).run(row.id, row.repository, row.path, row.content ?? '');
+}
+
+export function deleteCodeFile(db: Db, fileId: string): void {
+  db.prepare('DELETE FROM code_search WHERE file_id = ?').run(fileId);
+  db.prepare('DELETE FROM code_files WHERE id = ?').run(fileId);
+}
+
+export function deleteStaleCodeFiles(
+  db: Db,
+  repository: string,
+  ref: string,
+  keptFileIds: string[],
+): number {
+  const staleRows =
+    keptFileIds.length === 0
+      ? (db
+          .prepare('SELECT id FROM code_files WHERE repository = ? AND ref = ?')
+          .all(repository, ref) as Array<{ id: string }>)
+      : (db
+          .prepare(
+            `SELECT id FROM code_files
+             WHERE repository = ? AND ref = ?
+               AND id NOT IN (${keptFileIds.map(() => '?').join(', ')})`,
+          )
+          .all(repository, ref, ...keptFileIds) as Array<{ id: string }>);
+
+  for (const row of staleRows) {
+    deleteCodeFile(db, row.id);
+  }
+  return staleRows.length;
+}
+
+export function getCodeFile(db: Db, fileId: string): CodeFileRow | null {
+  const row = db
+    .prepare(
+      `SELECT
+         id,
+         account_id AS accountId,
+         provider,
+         repository,
+         path,
+         ref,
+         language,
+         size_bytes AS sizeBytes,
+         content,
+         content_hash AS contentHash,
+         source_updated_at AS sourceUpdatedAt,
+         synced_at AS syncedAt
+       FROM code_files
+       WHERE id = ?`,
+    )
+    .get(fileId) as CodeFileRow | undefined;
+  return row ?? null;
+}
+
+export function getCodeFileCount(db: Db): number {
+  const row = db.prepare('SELECT COUNT(*) AS count FROM code_files').get() as { count: number };
+  return row.count;
+}
+
+export function listReposIndexed(db: Db): IndexedRepoRow[] {
+  return db
+    .prepare(
+      `SELECT
+         account_id AS accountId,
+         provider,
+         repository,
+         ref,
+         COUNT(*) AS fileCount
+       FROM code_files
+       GROUP BY account_id, provider, repository, ref
+       ORDER BY repository ASC`,
+    )
+    .all() as unknown as IndexedRepoRow[];
+}
+
+export function searchCode(db: Db, query: string, limit: number): CodeSearchResultRow[] {
+  return db
+    .prepare(
+      `SELECT
+         file_id AS fileId,
+         repository,
+         path,
+         substr(content, 1, 200) AS excerpt
+       FROM code_search
+       WHERE code_search MATCH ?
+       ORDER BY bm25(code_search)
+       LIMIT ?`,
+    )
+    .all(query, limit) as unknown as CodeSearchResultRow[];
+}
+
 export type { Db };

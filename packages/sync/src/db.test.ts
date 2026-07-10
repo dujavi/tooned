@@ -10,7 +10,10 @@ import {
   getPageById,
   getStoryCommits,
   getStoryCount,
+  getCodeFileCount,
   rebuildConfluenceSearchRow,
+  searchCode,
+  upsertCodeFile,
   replacePageAttachments,
   replacePageRefs,
   replaceStoryCommits,
@@ -32,7 +35,7 @@ describe('getDb', () => {
   it('creates database with migrations applied', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'tooned-test-'));
     const db = getDb(dataDir);
-    expect(getMigrationVersion(db)).toBe(5);
+    expect(getMigrationVersion(db)).toBe(6);
     expect(getStoryCount(db)).toBe(0);
   });
 
@@ -145,5 +148,30 @@ describe('getDb', () => {
       .prepare('SELECT domain FROM extracted_refs WHERE id = ?')
       .get('CRM-101-0') as { domain: string };
     expect(row.domain).toBe('confluence');
+  });
+
+  it('stores code files and FTS rows', () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'tooned-test-code-'));
+    const db = getDb(dataDir);
+    const syncedAt = '2026-07-10T00:00:00.000Z';
+
+    upsertCodeFile(db, {
+      id: 'gh:acme/tools:src/index.ts',
+      accountId: 'gh',
+      provider: 'github',
+      repository: 'acme/tools',
+      path: 'src/index.ts',
+      ref: 'main',
+      language: 'typescript',
+      sizeBytes: 24,
+      content: 'export const ok = true;\n',
+      contentHash: 'hash',
+      sourceUpdatedAt: null,
+      syncedAt,
+    });
+
+    expect(getCodeFileCount(db)).toBe(1);
+    const hits = searchCode(db, 'export', 5);
+    expect(hits[0]?.path).toBe('src/index.ts');
   });
 });

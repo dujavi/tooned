@@ -38,6 +38,7 @@ export const VcsConfigSchema = z
       .default({ form: [], confluence: [] }),
     accounts: z.array(VcsAccountSchema).default([]),
     repos: z.array(VcsRepoTargetSchema).default([]),
+    maxFileBytes: z.number().int().positive().default(262_144),
   })
   .superRefine((value, ctx) => {
     const accountIds = new Set(value.accounts.map((account) => account.id));

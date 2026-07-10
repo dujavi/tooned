@@ -51,6 +51,7 @@ vcs:
   #     slug: my-repo
   accounts: []
   repos: []
+  maxFileBytes: 262144
 
 # Confluence page crawl settings (uses same ATLASSIAN_* credentials as Jira).
 confluence:

@@ -22,6 +22,13 @@ export {
   listEnrichmentsForStories,
   upsertStoryEnrichment,
   getConfluencePageCount,
+  getCodeFileCount,
+  getCodeFile,
+  listReposIndexed,
+  upsertCodeFile,
+  deleteStaleCodeFiles,
+  rebuildCodeSearchRow,
+  searchCode,
   getPageById,
   listPages,
   upsertConfluencePage,
@@ -33,6 +40,10 @@ export {
   searchGlobal,
   searchCodeStub,
   type ConfluencePageRow,
+  type CodeFileRow,
+  type CodeFileUpsertInput,
+  type CodeSearchResultRow,
+  type IndexedRepoRow,
   type ConfluencePageUpsertInput,
   type ConfluenceAttachmentUpsertInput,
   type PageRefUpsertInput,
@@ -61,6 +72,14 @@ export {
   type ConfluenceSyncOptions,
   type ConfluenceSyncResult,
 } from './confluence-sync.js';
+export {
+  runRepoSync,
+  CODE_BOOTSTRAP_COMPLETE_KEY,
+  CODE_BOOTSTRAP_CHECKPOINT_KEY,
+  CODE_LAST_SYNC_KEY,
+  type RepoSyncOptions,
+  type RepoSyncResult,
+} from './repo-sync.js';
 export { enrichStoryCommits } from './vcs-enrich.js';
 export {
   enrichStory,

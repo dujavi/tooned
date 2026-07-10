@@ -23,6 +23,10 @@ import {
   CONFLUENCE_BOOTSTRAP_COMPLETE_KEY,
   runConfluenceSync,
 } from './confluence-sync.js';
+import {
+  CODE_BOOTSTRAP_COMPLETE_KEY,
+  runRepoSync,
+} from './repo-sync.js';
 
 const SYNC_KEY = 'sync';
 const LAST_SYNC_KEY = 'lastSync';
@@ -579,6 +583,13 @@ async function executeSync(config: Config, options: SyncRunOptions = {}): Promis
       : (getSyncStateValue<boolean>(db, CONFLUENCE_BOOTSTRAP_COMPLETE_KEY) ?? false);
     if (force || !confluenceBootstrapComplete) {
       await runConfluenceSync(db, config, { force });
+    }
+
+    const codeBootstrapComplete = force
+      ? false
+      : (getSyncStateValue<boolean>(db, CODE_BOOTSTRAP_COMPLETE_KEY) ?? false);
+    if (force || !codeBootstrapComplete) {
+      await runRepoSync(db, config, { force });
     }
 
     const completedAt = nowIso();

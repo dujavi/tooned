@@ -45,7 +45,7 @@ function makeConfig(dataDir: string): Config {
       },
       fields: {},
       dodTemplates: [{ team: 'default', expectedSubtasks: ['Test'] }],
-      vcs: { urlDomains: { form: [], confluence: ['example.atlassian.net'] }, accounts: [], repos: [] },
+      vcs: { urlDomains: { form: [], confluence: ['example.atlassian.net'] }, accounts: [], repos: [], maxFileBytes: 262_144 },
       confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 1024 },
       parsing: {},
     },

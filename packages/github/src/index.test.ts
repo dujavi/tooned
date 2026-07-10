@@ -27,7 +27,7 @@ const baseConfig: Config = {
     jira: { projectKey: 'CRM', boardId: 1, storyIssueType: 'Story' },
     fields: {},
     dodTemplates: [],
-    vcs: { urlDomains: { form: [], confluence: [] }, accounts: [], repos: [] },
+    vcs: { urlDomains: { form: [], confluence: [] }, accounts: [], repos: [], maxFileBytes: 262_144 },
     confluence: { mode: 'all', spaces: [], maxAttachmentBytes: 524_288 },
     parsing: {},
   },
